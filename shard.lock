@@ -2,5 +2,13 @@ version: 2.0
 shards:
   crsfml:
     git: https://github.com/oprypin/crsfml.git
-    version: 2.5.1
+    version: 2.5.2
+
+  imgui:
+    git: https://github.com/oprypin/crystal-imgui.git
+    version: 0.1.0+git.commit.80040f2631af401002367c522f775cc5a33ef50a
+
+  imgui-sfml:
+    git: https://github.com/oprypin/crystal-imgui-sfml.git
+    version: 2.1.0+git.commit.6ccb384badc40a5d2432d39f5a9ee053aae27313
 

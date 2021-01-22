@@ -10,12 +10,19 @@ class Arm7
 
     @opcode = 0_u32
 
-    @registers = Array(UInt8).new(37, 0_u8)
+    @registers = Array(UInt32).new(16, 0_u8)
+
+    @registers[15] = @pc
 
     @debug = false
   end
 
+  def getRegs
+    @registers
+  end
+
   def run
+    @pc = @registers[15]
     @opcode = @bus.arm7_load32(@pc.to_i32 * -1)
     @pc += 4
 
@@ -32,6 +39,8 @@ class Arm7
     if @debug
       puts "DEBUG7: opcode #{@opcode.to_s(16)} bits4-7 #{op1.to_s(16)}, bits20-27 #{op2.to_s(16)}"
     end
+
+    @registers[15] = @pc
   end
 
   def running
@@ -39,6 +48,8 @@ class Arm7
   end
 
   ######## OPCODES ########
+
+  # TODO: all of arm7 is bad, even arm9 is bad, everything is bad. fix pls
 
   def opcode_b
     condition = (@opcode & (0xF << 28)) >> 28

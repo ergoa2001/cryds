@@ -8,7 +8,7 @@ module CryDS
   extend self
 
   def run
-    rom = File.read("./roms/armwrestler.nds").bytes
+    rom = File.read("./roms/TinyFB.nds").bytes
 
     displayEngineA = DisplayEngineA.new
 
@@ -24,7 +24,7 @@ module CryDS
       end
       runtime += elapsed_time.nanoseconds
       if runtime >= 16666666
-        displayEngineA.updateScreen
+        displayEngineA.updateScreen(arm9.getRegs, arm7.getRegs)
         runtime = 0
       end
     end

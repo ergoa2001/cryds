@@ -13,6 +13,9 @@ crystal: 0.35.1
 dependencies:
   crsfml:
     github: oprypin/crsfml
-    version: 2.5.1
+  imgui:
+    github: oprypin/crystal-imgui
+  imgui-sfml:
+    github: oprypin/crystal-imgui-sfml
 
 license: MIT

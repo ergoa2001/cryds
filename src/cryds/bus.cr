@@ -1,3 +1,4 @@
+require "colorize"
 
 class Bus
   @rom : Array(UInt8)
@@ -6,6 +7,8 @@ class Bus
   def initialize(rom, displayEngineA)
     @rom = rom
     @title = Array(UInt8).new
+
+    @ITCM = Array(UInt8).new(0x8000, 0_u8)
 
     @arm9_rom_offset = 0_u32
     @arm9_entry_address = 0_u32
@@ -53,6 +56,11 @@ class Bus
     @arm7_ram_address = rom[0x38].to_u32 | rom[0x38 + 1].to_u32 << 8 | rom[0x38 + 2].to_u32 << 16 | rom[0x38 + 3].to_u32 << 24
     @arm7_size = rom[0x3C].to_u32 | rom[0x3C + 1].to_u32 << 8 | rom[0x3C + 2].to_u32 << 16 | rom[0x3C + 3].to_u32 << 24
 
+    print "Title: "
+    @title.each do |x|
+      print x.chr
+    end
+    puts
     puts "DEBUG: arm9_rom_offset : 0x#{@arm9_rom_offset.to_s(16)}"
     puts "DEBUG: arm9_entry_address : 0x#{@arm9_entry_address.to_s(16)}"
     puts "DEBUG: arm9_ram_address : 0x#{@arm9_ram_address.to_s(16)}"
@@ -72,7 +80,7 @@ class Bus
       pos = pos * -1
       @rom[pos].to_u32 | @rom[pos + 1].to_u32 << 8 | @rom[pos + 2].to_u32 << 16 | @rom[pos + 3].to_u32 << 24
     else
-      puts "DEBUG7: Unhandled read32 at 0x#{pos.to_s(16)}"
+      puts "DEBUG9: Unhandled load32 at 0x#{pos.to_s(16)}".colorize(:red)
       0_u32
     end
   end
@@ -81,42 +89,46 @@ class Bus
     if pos < 0
       # ROM read
       pos = pos * -1
-      @rom[pos].to_u32 | @rom[pos + 1].to_u32 << 8 | @rom[pos + 2].to_u32 << 16 | @rom[pos + 3].to_u32 << 24
+      @rom[pos].to_u16 | @rom[pos + 1].to_u16 << 8
     else
-      puts "DEBUG7: Unhandled read32 at 0x#{pos.to_s(16)}"
+      puts "DEBUG9: Unhandled load16 from 0x#{pos.to_s(16)}".colorize(:red)
       0_u32
     end
   end
 
   def arm9_load8(pos)
-    puts "DEBUG9: load8 pos #{pos.to_s(16)}"
+    puts "DEBUG9: Unhandled load8 pos #{pos.to_s(16)}".colorize(:red)
     0_u32
   end
 
   def arm9_store32(addr, data)
     case addr
-
+    when (0x00000000..0x000008000)
+      @ITCM[addr] = ((data & 0xFF000000) >> 24).to_u8
+      @ITCM[addr + 1] = ((data & 0xFF0000) >> 16).to_u8
+      @ITCM[addr + 2] = ((data & 0xFF00) >> 8).to_u8
+      @ITCM[addr + 3] = (data & 0xFF).to_u8
     when 0x04000304 then @POWCNT1 = data
     when (0x04000000..0x0400006C) then @displayEngineA.store32(addr, data)
     when (0x04000240..0x04000249) then @displayEngineA.store32(addr, data)
     when (0x04000000..0x05000000)
-      puts "DEBUG9: Unhandled store32 to I/O ports #{addr.to_s(16)}"
+      puts "DEBUG9: Unhandled store32 to I/O ports #{addr.to_s(16)}".colorize(:red)
     else
-      puts "DEBUG9: store32 pos #{addr.to_s(16)}, data #{data.to_s(16)}"
+      puts "DEBUG9: Unhandled store32 pos #{addr.to_s(16)}, data #{data.to_s(16)}".colorize(:red)
     end
   end
 
   def arm9_store16(addr, data)
     case addr
-    when (0x6800000..0x681FFFF) then @displayEngineA.store16(addr, data)
+    when (0x6800000..0x681FFFF) then @displayEngineA.store16(addr, data.to_u16!)
 
     else
-      puts "DEBUG9: store16 pos #{addr.to_s(16)}, data #{data.to_s(16)}"
+      puts "DEBUG9: Unhandled store16 pos #{addr.to_s(16)}, data #{data.to_u16!.to_s(16)}".colorize(:red)
     end
   end
 
   def arm9_store8(pos, data)
-    puts "DEBUG9: store8 pos #{pos.to_s(16)}"
+    puts "DEBUG9: Unhandled store8 pos #{pos.to_s(16)}".colorize(:red)
   end
 
   def arm7_load32(pos)
@@ -125,7 +137,7 @@ class Bus
       pos = pos * -1
       return @rom[pos].to_u32 | @rom[pos + 1].to_u32 << 8 | @rom[pos + 2].to_u32 << 16 | @rom[pos + 3].to_u32 << 24
     else
-      puts "DEBUG7: Unhandled read32 at 0x#{pos.to_s(16)}"
+      puts "DEBUG7: Unhandled load32 at 0x#{pos.to_s(16)}".colorize(:red)
       return 0_u32
     end
   end

@@ -1,14 +1,25 @@
 require "crsfml"
+require "imgui"
+require "imgui-sfml"
 
-WIDTH = 256
-HEIGHT = 256*2
+
+WIDTH = 1280 #256
+HEIGHT = 720 #256*2
 
 class DisplayEngineA
   def initialize
     @window = SF::RenderWindow.new(SF::VideoMode.new(WIDTH, HEIGHT), "CryDS", settings: SF::ContextSettings.new(depth: 24, antialiasing: 8))
     @window.vertical_sync_enabled = true
+    #@window.framerate_limit = 60
+    ImGui::SFML.init(@window)
 
-    @texture = SF::Texture.new(256, 256)
+    @delta_clock = SF::Clock.new
+
+    # Tahaks mingi list boxi teha kus sees romide valik
+    @roms = Dir.new("././roms")
+    @roms.each { |x| puts x}
+
+    @texture = SF::Texture.new(256, 192)
     @sprite = SF::Sprite.new(@texture)
 
     @lcd_control = 0_u32
@@ -30,17 +41,23 @@ class DisplayEngineA
     when (0x6800000..0x681FFFF)
       @vram_a[addr - 0x6800000] = ((data & (0xFF << 8)) >> 8).to_u8
       @vram_a[addr - 0x6800000 + 1] = (data & 0xFF).to_u8
-
     end
   end
 
-  def updateScreen
-    while event = @window.poll_event
+  def updateScreen(regs9, regs7)
+    # Called once every 1/60th of a second, converts BGR565 to RGB888, displays it
+
+    while (event = @window.poll_event)
+      ImGui::SFML.process_event(event)
+
       if event.is_a? SF::Event::Closed
         @window.close
         exit
       end
     end
+    ImGui::SFML.update(@window, @delta_clock.restart)
+
+    # Pixel conversion
     pixels = Array(UInt8).new
     (0...@vram_a.size / 2).each do |pixel_index|
       index = pixel_index*2
@@ -64,8 +81,30 @@ class DisplayEngineA
       pixels << 255
 
     end
-    @texture.update(pixels.to_unsafe.as(UInt8*), 256, 256, 0, 0)
-    @window.draw @sprite
+
+
+    @texture.update(pixels.to_unsafe.as(UInt8*), 256, 192, 0, 0)
+    ImGui.begin("VRAM_A")
+    ImGui.image(@texture)
+    ImGui.end
+
+    ImGui.begin("Registers ARM9")
+    regs9.each_with_index do |reg, i|
+      ImGui.text("R#{i}: 0x#{reg.to_s(16)}" )
+    end
+    ImGui.end
+
+    ImGui.begin("Registers ARM7")
+    regs7.each_with_index do |reg, i|
+      ImGui.text("R#{i}: 0x#{reg.to_s(16)}" )
+    end
+    ImGui.end
+
+    @window.clear
+    #@window.draw @sprite
+    ImGui::SFML.render(@window)
     @window.display
+
+
   end
 end
