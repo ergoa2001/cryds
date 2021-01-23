@@ -94,7 +94,20 @@ class Arm9
       rot = ((@opcode & (0xF << 8)) >> 8)*2
       op2 = ((@opcode & 0xFF) >> rot) | ((@opcode & 0xFF) << (32 - rot))
     else
-      op2 = @registers[@opcode & 0xF] >> ((@opcode & 0xFF0) >> 4)
+      shift = ((@opcode & 0xFF0) >> 4)
+      if shift & 1 == 0
+        shiftamount = (shift & 0b11111000) >> 3
+      else
+        shiftamount = @registers[(shift & 0b11111000) >> 3] & 0xFF
+      end
+      case (shift & 0b110) >> 1
+      when 0b00 then op2 = @registers[@opcode & 0xF] << shiftamount
+      when 0b01 then op2 = @registers[@opcode & 0xF] >> shiftamount
+      else
+        op2 = 0_u32
+        puts "DEBUG9: Unimplemented data processing shift"
+      end
+
     end
 
     # Condition check
@@ -242,7 +255,19 @@ class Arm9
       # Immediate offset
       offset = @opcode & 0xFFF
     else
-      offset = (@opcode & 0xF) >> ((@opcode & 0xFF0) >> 4)
+      shift = ((@opcode & 0xFF0) >> 4)
+      if shift & 1 == 0
+        shiftamount = (shift & 0b11111000) >> 3
+      else
+        shiftamount = @registers[(shift & 0b11111000) >> 3] & 0xFF
+      end
+      case (shift & 0b110) >> 1
+      when 0b00 then offset = @registers[@opcode & 0xF] << shiftamount
+      when 0b01 then offset = @registers[@opcode & 0xF] >> shiftamount
+      else
+        offset = 0_u32
+        puts "DEBUG9: Unimplemented data processing shift"
+      end
     end
 
     base_reg = @registers[(@opcode & (0xF << 16)) >> 16]

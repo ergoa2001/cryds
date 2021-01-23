@@ -90,6 +90,8 @@ class Bus
       # ROM read
       pos = pos * -1
       @rom[pos].to_u16 | @rom[pos + 1].to_u16 << 8
+    elsif pos < 0xac3e
+      @rom[pos].to_u16 | @rom[pos + 1].to_u16 << 8
     else
       puts "DEBUG9: Unhandled load16 from 0x#{pos.to_s(16)}".colorize(:red)
       0_u32
@@ -127,8 +129,11 @@ class Bus
     end
   end
 
-  def arm9_store8(pos, data)
-    puts "DEBUG9: Unhandled store8 pos #{pos.to_s(16)}".colorize(:red)
+  def arm9_store8(addr, data)
+    case addr
+    when 0x4000240 then @displayEngineA.store8(addr, data)
+    else puts "DEBUG9: Unhandled store8 pos #{addr.to_s(16)}".colorize(:red)
+    end
   end
 
   def arm7_load32(pos)

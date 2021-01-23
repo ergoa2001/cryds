@@ -8,7 +8,7 @@ module CryDS
   extend self
 
   def run
-    rom = File.read("./roms/TinyFB.nds").bytes
+    rom = File.read("./roms/armwrestler.nds").bytes
 
     displayEngineA = DisplayEngineA.new
 
