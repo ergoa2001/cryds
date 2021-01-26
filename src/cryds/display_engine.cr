@@ -8,20 +8,6 @@ HEIGHT = 720 #256*2
 
 class DisplayEngineA
   def initialize
-    @window = SF::RenderWindow.new(SF::VideoMode.new(WIDTH, HEIGHT), "CryDS", settings: SF::ContextSettings.new(depth: 24, antialiasing: 8))
-    @window.vertical_sync_enabled = true
-    #@window.framerate_limit = 60
-    ImGui::SFML.init(@window)
-
-    @delta_clock = SF::Clock.new
-
-    # Tahaks mingi list boxi teha kus sees romide valik
-    @roms = Dir.new("././roms")
-    @roms.each { |x| puts x}
-
-    @texture = SF::Texture.new(256, 192)
-    @sprite = SF::Sprite.new(@texture)
-
     @lcd_control = 0_u32
     @vramcnt_a = 0_u8
     @vramcnt_b = 0_u8
@@ -32,6 +18,11 @@ class DisplayEngineA
     case addr
     when 0x04000000 then @lcd_control = data
     when 0x04000240 then @vramcnt_a = data.to_u8! # TODO: wrong, i think
+    when (0x6800000..0x681FFFF)
+      @vram_a[addr - 0x6800000] = ((data & (0xFF << 24)) >> 24).to_u8
+      @vram_a[addr - 0x6800000 + 1] = ((data & (0xFF << 16)) >> 16).to_u8
+      @vram_a[addr - 0x6800000 + 2] = ((data & (0xFF << 8)) >> 8).to_u8
+      @vram_a[addr - 0x6800000 + 3] = (data & 0xFF).to_u8
     else
       puts "DEBUGDEA: Unhandled store32 at #{addr.to_s(16)}"
     end
@@ -46,25 +37,13 @@ class DisplayEngineA
   end
   def store8(addr, data)
     case addr
-    when 0x4000240
+    when 0x4000240 # ???? reading 0s from the top lol?
       @vramcnt_a = ((data & (0xFF << 8)) >> 8).to_u8
       @vramcnt_b = (data & 0xFF).to_u8
     end
   end
 
-  def updateScreen(regs9, regs7)
-    # Called once every 1/60th of a second, converts BGR565 to RGB888, displays it
-
-    while (event = @window.poll_event)
-      ImGui::SFML.process_event(event)
-
-      if event.is_a? SF::Event::Closed
-        @window.close
-        exit
-      end
-    end
-    ImGui::SFML.update(@window, @delta_clock.restart)
-
+  def getPixels
     # Pixel conversion
     pixels = Array(UInt8).new
     (0...@vram_a.size / 2).each do |pixel_index|
@@ -87,32 +66,8 @@ class DisplayEngineA
       pixels << g8.to_u8
       pixels << b8.to_u8
       pixels << 255
-
     end
-
-
-    @texture.update(pixels.to_unsafe.as(UInt8*), 256, 192, 0, 0)
-    ImGui.begin("VRAM_A")
-    ImGui.image(@texture)
-    ImGui.end
-
-    ImGui.begin("Registers ARM9")
-    regs9.each_with_index do |reg, i|
-      ImGui.text("R#{i}: 0x#{reg.to_s(16)}" )
-    end
-    ImGui.end
-
-    ImGui.begin("Registers ARM7")
-    regs7.each_with_index do |reg, i|
-      ImGui.text("R#{i}: 0x#{reg.to_s(16)}" )
-    end
-    ImGui.end
-
-    @window.clear
-    #@window.draw @sprite
-    ImGui::SFML.render(@window)
-    @window.display
-
-
+    pixels
   end
+
 end
