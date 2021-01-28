@@ -8,11 +8,7 @@ module CryDS
   VERSION = "0.1.0"
   extend self
 
-
-
   def run
-    gui = Gui.new
-
     rom = File.read("./roms/redpanda.nds").bytes
 
     displayEngineA = DisplayEngineA.new
@@ -21,6 +17,8 @@ module CryDS
     debug = false
     arm7 = Arm7.new(bus)
     arm9 = Arm9.new(bus, debug)
+
+    gui = Gui.new(arm9.getRegPointer, arm7.getRegPointer, arm9.get_sp_irq_pointer, arm9.get_sp_usr_pointer)
 
     runtime = 0
     while arm7.running && arm9.running
@@ -31,7 +29,7 @@ module CryDS
       end
       runtime += elapsed_time.nanoseconds
       if runtime >= 5000000 #16666666
-        gui.updateScreen(arm9.getRegs, arm7.getRegs, displayEngineA.getPixels)
+        gui.updateScreen(displayEngineA.getPixels)
         runtime = 0
       end
 
@@ -43,6 +41,7 @@ module CryDS
         bus = Bus.new(rom, displayEngineA)
         arm7 = Arm7.new(bus)
         arm9 = Arm9.new(bus, debug)
+        gui.setPointers(arm9.getRegPointer, arm7.getRegPointer, arm9.get_sp_irq_pointer, arm9.get_sp_usr_pointer)
       end
 
       if gui.debug

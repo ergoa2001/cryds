@@ -1,6 +1,6 @@
 
 class Gui
-  def initialize
+  def initialize(arm9regs : Pointer(Array(UInt32)), arm7regs : Pointer(Array(UInt32)), sp_irq : Pointer(UInt32), sp_usr : Pointer(UInt32))
     @window = SF::RenderWindow.new(SF::VideoMode.new(WIDTH, HEIGHT), "CryDS", settings: SF::ContextSettings.new(depth: 24, antialiasing: 8))
     @window.vertical_sync_enabled = true
     #@window.framerate_limit = 60
@@ -19,6 +19,11 @@ class Gui
     @debug = false
 
     @texture = SF::Texture.new(256, 192)
+
+    @arm9regs = arm9regs
+    @arm7regs = arm7regs
+    @sp_irq = sp_irq
+    @sp_usr = sp_usr
   end
 
   def debugFalse
@@ -29,8 +34,14 @@ class Gui
     @debug
   end
 
-  def updateScreen(regs9, regs7, pixels)
-    # Called once every 1/60th of a second, converts BGR565 to RGB888, displays it
+  def setPointers(arm9regs : Pointer(Array(UInt32)), arm7regs : Pointer(Array(UInt32)), sp_irq : Pointer(UInt32), sp_usr : Pointer(UInt32))
+    @arm9regs = arm9regs
+    @arm7regs = arm7regs
+    @sp_irq = sp_irq
+    @sp_usr = sp_usr
+  end
+
+  def updateScreen(pixels)
 
     while (event = @window.poll_event)
       ImGui::SFML.process_event(event)
@@ -60,10 +71,10 @@ class Gui
     ImGui.begin("Registers")
       ImGui.text("    ARM7    ARM9" )
       (0...16).each do |i|
-        ImGui.text("R#{i}: 0x#{regs7[i].to_s(16)}   0x#{regs9[i].to_s(16)}")
+        ImGui.text("R#{i}: 0x#{@arm7regs.value[i].to_s(16)}   0x#{@arm9regs.value[i].to_s(16)}")
       end
-      ImGui.text("sp_irq: 0x#{regs9[16].to_s(16)}")
-      ImGui.text("sp_usr: 0x#{regs9[17].to_s(16)}")
+      ImGui.text("sp_irq: 0x#{@sp_irq.value.to_s(16)}")
+      ImGui.text("sp_usr: 0x#{@sp_usr.value.to_s(16)}")
 
     ImGui.end
 

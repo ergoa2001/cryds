@@ -1,4 +1,6 @@
 
+# TODO: copy code from arm9 and make this atleast a little nicer
+
 class Arm7
   @pc : UInt32
   def initialize(bus : Bus)
@@ -19,6 +21,10 @@ class Arm7
 
   def getRegs
     @registers
+  end
+
+  def getRegPointer
+    pointerof(@registers)
   end
 
   def run

@@ -1,7 +1,7 @@
 require "colorize"
 
-
 class Arm9
+
   @pc : UInt32
   def initialize(bus : Bus, debug : Bool)
     @running = true
@@ -42,9 +42,21 @@ class Arm9
     @spsr_und = 0_u32
 
     @debug = debug
-    @debug_args = Array(String).new()
-    @debug_prev = ""
+    @debug_args = Array(String).new
+    @debug_prev = Array(String).new
 
+  end
+
+  def getRegPointer
+    pointerof(@registers)
+  end
+
+  def get_sp_irq_pointer
+    pointerof(@sp_irq)
+  end
+
+  def get_sp_usr_pointer
+    pointerof(@sp_usr)
   end
 
   def getRegs
@@ -58,17 +70,39 @@ class Arm9
     @debug = !@debug
   end
 
+  def reset_flags
+    @flag_N = false
+    @flag_Z = false
+    @flag_C = false
+    @flag_V = false
+  end
+
+  def set_logical_flags(answer)
+    # V flag unaffected
+    @flag_Z = answer == 0
+    @flag_N = answer & (1 << 31) != 0
+    # TODO: Carry flag
+  end
+
+  def set_arithmetic_flags(answer)
+    @flag_V = answer & (1 << 31) != 0
+    @flag_N = answer & (1 << 31) != 0
+    # TODO: Carry flag
+    @flag_Z = answer == 0
+  end
+
   def run
 
-    if @debug
-      @debug_args = Array(String).new()
-    end
-
     @pc = @registers[15]
-
-    @opcode = @bus.arm9_load32(@pc.to_i32 * -1)
+    @opcode = @bus.arm9_get_opcode(@pc)
     @prevpc = @pc
     @pc += 4
+
+
+
+    if @debug
+      @debug_args.clear
+    end
 
     # Not needed, but easier to find opcode from http://imrannazar.com/ARM-Opcode-Map
     op1 = (@opcode & 0xF0) >> 4
@@ -93,7 +127,6 @@ class Arm9
       opcode_halfword_data_immediate
     elsif @opcode & 0xC000000 == 0x4000000 && @opcode & 0x2000010 != 0x2000010
       opcode_single_data_transfer
-
     elsif @opcode & 0xE000000 == 0x8000000
       opcode_block_data_transfer
     # elsif @opcode & 0b1111100000000000000011110000 == 0b0000100000000000000010010000
@@ -112,14 +145,11 @@ class Arm9
     end
 
     if @debug
-      #puts "DEBUG9: pcode #{@opcode.to_s(16)} bits4-7 #{op1.to_s(16)}, bits20-27 #{op2.to_s(16)}"
-      #puts "DEBUG9: #{@debug_args}"
-      if @debug_args[0] != @debug_prev
+      if @debug_args != @debug_prev
         puts "DEBUG9: #{@debug_args}"
       end
-      @debug_prev = @debug_args[0]
+      @debug_prev = @debug_args.clone
     end
-
     @registers[15] = @pc
   end
 
@@ -130,59 +160,50 @@ class Arm9
   ################ OPCODES ################
 
   def opcode_data_processing
-
-    operation = (@opcode & (0b1111 << 21)) >> 21
-    op1 = @registers[(@opcode & (0xF << 16)) >> 16]
-    change_flags = (@opcode & 1) << 20 != 0
-    if @opcode & (1 << 25) != 0
-      rot = ((@opcode & (0xF << 8)) >> 8)*2
-      op2 = ((@opcode & 0xFF) >> rot) | ((@opcode & 0xFF) << (32 - rot))
-    else
-      shift = ((@opcode & 0xFF0) >> 4)
-      if shift & 1 == 0
-        shiftamount = (shift & 0b11111000) >> 3
-      else
-        shiftamount = @registers[(shift & 0b11111000) >> 3] & 0xFF
-      end
-      case (shift & 0b110) >> 1
-      when 0b00 then op2 = @registers[@opcode & 0xF] << shiftamount
-      when 0b01 then op2 = @registers[@opcode & 0xF] >> shiftamount
-      else
-        op2 = 0_u32
-        puts "DEBUG9: Unimplemented data processing shift"
-      end
-    end
-
     # Condition check
-    cond = true
     condition = (@opcode & (0xF << 28)) >> 28
-    case condition
-    when 0b0000
-      if !@flag_Z
-        cond = false
-      end
-    when 0b0001
-      # NE
-      if @flag_Z
-        cond = false
-      end
-    when 0b0101 then cond = true
-    when 0b1110 # AL
-    else puts "DEBUG9: Invalid opcode_data_processing condition, #{condition.to_s(16)}"
+    cond = case condition
+    when 0b0000 then @flag_Z ? true : false # EQ
+    when 0b0001 then !@flag_Z ? true : false # NE
+    when 0b0101 then true # ??
+    when 0b1110 then true# AL
+    else
+      false
+      puts "DEBUG9: Invalid opcode_data_processing condition, #{condition.to_s(16)}"
     end
 
     if cond
+      operation = (@opcode & (0b1111 << 21)) >> 21
+      op1 = @registers[(@opcode & (0xF << 16)) >> 16]
+      change_flags = (@opcode & (1 << 20)) != 0
+      if @opcode & (1 << 25) != 0
+        rot = ((@opcode & (0xF << 8)) >> 8)*2
+        op2 = ((@opcode & 0xFF) >> rot) | ((@opcode & 0xFF) << (32 - rot))
+      else
+        shift = ((@opcode & 0xFF0) >> 4)
+        shiftamount = shift & 1 == 0 ? (shift & 0b11111000) >> 3 : @registers[(shift & 0b11111000) >> 3] & 0xFF
+        case (shift & 0b110) >> 1
+        when 0b00
+          op2 = @registers[@opcode & 0xF] << shiftamount
+        when 0b01
+          if shiftamount == 0
+            shiftamount = 32
+          end
+          op2 = @registers[@opcode & 0xF] >> shiftamount
+        else
+          op2 = 0_u32
+          puts "DEBUG9: Unimplemented data processing shift"
+        end
+      end
+      destination = (@opcode & (0xF << 12)) >> 12
+
       # check for MRS/MSR
       if @opcode & 0b00001111101111110000111111111111 == 0b00000001000011110000000000000000 # MRS
         if @debug
           @debug_args << "MRS"
         end
       elsif @opcode & 0b00001111101111111111111111110000 == 0b00000001001010011111000000000000 # MSR, register to PSR
-        if @opcode & (1 << 22) == 0
-          dest_CPSR = true
-        else
-          dest_CPSR = false
-        end
+        dest_CPSR = @opcode & (1 << 22) == 0
         reg = @opcode & 0b1111
         data = @registers[reg]
         if dest_CPSR
@@ -202,58 +223,65 @@ class Arm9
         end
       elsif @opcode & 0b00001101101111111111000000000000 == 0b00000001001010001111000000000000 # MSR reg or imm to PSR flag bits only
         if @debug
-          @debug_args << "MSR2"
+          @debug_args << "MSR2 (Unimplemented)"
         end
       else
         case operation
         when 0b0000 # AND
-          answer = @registers[(@opcode & (0xF << 16)) >> 16] & op2
-          @registers[(@opcode & (0xF << 12)) >> 12] = answer
+          answer = op1 & op2
+          @registers[destination] = answer
+
+          # TODO: FLAGS
           if change_flags
-            if answer == 0
-              @flag_Z = true
-            else
-              @flag_Z = false
-            end
+            set_logical_flags(answer)
           end
           if @debug
             @debug_args << "AND"
           end
-        #elsif operation == 0b0001
+        when 0b0001 # EOR
+          answer = op1 ^ op2
+          @registers[destination] = answer
+          set_logical_flags(answer)
         when 0b0010 # SUB
           answer = op1 &- op2
-          @registers[(@opcode & (0xF << 12)) >> 12] = answer
-          if answer == 0
-            @flag_Z = true
-          else
-            @flag_Z = false
+          @registers[destination] = answer
+          if change_flags
+            @flag_Z = answer == 0
           end
 
-          if @debug# && @pc != 0x2d8
+          if @debug
             @debug_args << "SUB"
+            @debug_args << destination.to_s
           end
         #elsif operation == 0b0011
+        when 0b0011 # RSB
+          answer = op2 &- op1
+          @registers[destination] = answer
+          # TODO: FLAGS
+          if @debug
+            @debug_args << "RSB"
+          end
         when 0b0100 # ADD
           answer = op1 &+ op2
-          @registers[(@opcode & (0xF << 12)) >> 12] = answer
+          @registers[destination] = answer
+          # TODO: FLAGS
           if change_flags
-            if answer & (1 << 31) != 0
-              @flag_N = true
-            else
-              @flag_N = false
-            end
-            if answer == 0
-              @flag_Z = true
-            else
-              @flag_Z = false
-            end
+            @flag_N = answer & (1 << 31) != 0
+            @flag_Z = answer == 0
           end
           if @debug
             @debug_args << "ADD"
           end
-        #elsif operation == 0b0100
-
-        #elsif operation == 0b0101
+        when 0b0101 # ADC
+          answer = op1 &+ op2
+          if @flag_C
+            answer += 1
+          end
+          @registers[destination] = answer
+          # TODO: FLAGS
+          if @debug
+            @debug_args << "ADC"
+          end
         when 0b0110 # SBC
           bit = @flag_C ? 1_u32 : 0_u32
           @registers[(@opcode & (0xF << 12)) >> 12] = op1 - op2 + bit - 1
@@ -261,17 +289,28 @@ class Arm9
           if @debug
             @debug_args << "SBC"
           end
-        #elsif operation == 0b0111
-
-        #elsif operation == 0b1000
-      when 0b1001 # TEQ
-          answer = op1 ^ op2
-          if answer == 0
-            @flag_Z = true
-          else
-            @flag_Z = false
+        when 0b0111 # RSC
+          answer = op2 - op1 - 1
+          if @flag_C
+            answer += 1
           end
-
+          # TODO: FLAGS
+          if @debug
+            @debug_args << "RSC"
+          end
+        when 0b1000 # TST
+          answer = op1 & op2
+          if change_flags
+            set_logical_flags(answer)
+          end
+          if @debug
+            @debug_args << "TEQ"
+          end
+        when 0b1001 # TEQ
+          answer = op1 ^ op2
+          if change_flags
+            set_logical_flags(answer)
+          end
           if @debug
             @debug_args << "TEQ"
           end
@@ -287,59 +326,47 @@ class Arm9
           if @debug
             @debug_args << "CMP"
           end
-        #elsif operation == 0b1011
+        when 0b1011 # CMN
+          answer = op1 &+ op2
+          # TODO: FLAGS
 
-        #elsif operation == 0b1100
         when 0b1100 # ORR
           answer = op1 | op2
-          @registers[(@opcode & (0xF << 12)) >> 12] = answer
-          if answer == 0
-            @flag_Z = true
-          else
-            @flag_Z = false
+          @registers[destination] = answer
+          if change_flags
+            set_logical_flags(answer)
           end
-          if answer & 1 << 31 != 0
-            @flag_N = true
-          else
-            @flag_N = false
+          if @debug
+            @debug_args << "ORR"
           end
         when 0b1101 # MOV
-          reg = (@opcode & (0xF << 12)) >> 12
-          @registers[reg] = op2
+          @registers[destination] = op2
           if change_flags
-            if op2 == 0
-              @flag_Z = 1
-            end
-            if op2 & 1 << 31 != 0
-              @flag_N = true
-            else
-              @flag_N = false
-            end
+            set_logical_flags(op2)
           end
           if @debug
             @debug_args << "MOV"
-            @debug_args << reg.to_s
+            @debug_args << destination.to_s
           end
-        when 0b1110
+        when 0b1110 # BIC
           answer = op1 & ~op2
-          reg = (@opcode & (0xF << 12)) >> 12
-          @registers[reg] = answer
-          if answer == 0
-            @flag_Z = true
-          else
-            @flag_Z = false
+          @registers[destination] = answer
+          if change_flags# && destination != 15
+            set_logical_flags(answer)
           end
-
           if @debug
             @debug_args << "BIC"
             @debug_args << op1.to_s(16)
             @debug_args << (~op2).to_s(16)
-            @debug_args << reg.to_s
+            @debug_args << destination.to_s
           end
-        #elsif operation == 0b1110
-
-        #elsif operation == 0b1111
-
+        when 0b1111 # MVN
+          answer = ~op2
+          @registers[destination] = answer
+          # TODO: FLAGS
+          if @debug
+            @debug_args << "MVN"
+          end
         else
           puts "DEBUG9: missing opcode_dataprocessing #{operation.to_s(2)}"
         end
@@ -353,6 +380,7 @@ class Arm9
       if @debug
         @debug_args << "nul"
       end
+
     end
   end
 
@@ -373,12 +401,13 @@ class Arm9
       # Immediate offset
       offset = @opcode & 0xFFF
     else
-      shift = ((@opcode & 0xFF0) >> 4)
+      shift = (@opcode & 0xFF0) >> 4
       if shift & 1 == 0
         shiftamount = (shift & 0b11111000) >> 3
       else
-        shiftamount = @registers[(shift & 0b11111000) >> 3] & 0xFF
+        shiftamount = @registers[(shift & 0b11110000) >> 4] & 0xFF
       end
+
       case (shift & 0b110) >> 1
       when 0b00 then offset = @registers[@opcode & 0xF] << shiftamount
       when 0b01 then offset = @registers[@opcode & 0xF] >> shiftamount
@@ -392,21 +421,28 @@ class Arm9
     if (@opcode & (0xF << 16)) >> 16 == 15
       base_reg -= 8
     end
-    # TODO: pre/post add
+    storemem = @opcode & (1 << 20) == 0
+    writeback = @opcode & (1 << 21) != 0
+    datasize = @opcode & (1 << 22) == 0
+
     # TODO: write-back bit
     prepost = @opcode & (1 << 24) != 0
     add_offset = @opcode & (1 << 23) != 0
     address = base_reg
     if prepost
       if add_offset
-        address = base_reg + offset
+        address += offset
       else
-        #puts "adding #{base_reg.to_s(16)}, #{offset.to_s(16)}, reg #{(@opcode & (0xF << 16)) >> 16}"
-        address = base_reg - offset
+        address -= offset
       end
     end
-    storemem = @opcode & (1 << 20) == 0
-    datasize = @opcode & (1 << 22) == 0
+    #puts "#{offset.to_s(16)}, pre_add #{prepost}, add #{add_offset}, writeback #{writeback}"
+
+
+    if writeback && prepost
+      @registers[(@opcode & (0xF << 16)) >> 16] = address
+    end
+
     if storemem
       data = @registers[(@opcode & (0xF << 12)) >> 12]
       if datasize
@@ -427,11 +463,11 @@ class Arm9
     else
       if datasize
         data = @bus.arm9_load32(address)
-        #if @debug
+        if @debug
           @debug_args << "LDR"
           @debug_args << address.to_s(16)
           @debug_args << data.to_s(16)
-        #end
+        end
       else
         data = @bus.arm9_load8(address)
         if @debug
@@ -456,15 +492,17 @@ class Arm9
         # setting SP, depends on mode
       else
         @registers[reg] = data
+        if reg == 15
+          @pc = data
+        end
       end
 
     end
-
     if !prepost
       if add_offset
-        @registers[(@opcode & (0xF << 16)) >> 16] = base_reg + offset
+        @registers[(@opcode & (0xF << 16)) >> 16] = address + offset
       else
-        @registers[(@opcode & (0xF << 16)) >> 16] = base_reg - offset
+        @registers[(@opcode & (0xF << 16)) >> 16] = address - offset
       end
     end
   end
@@ -476,11 +514,12 @@ class Arm9
 
     condition = (@opcode & (0xF << 28)) >> 28
     offset = (@opcode & 0xFFFFFF).to_i32
-    offset = offset - (offset >> 23 << 24)
+    offset = offset - ((offset >> 23) << 24)
     # TODO: Link bit
     linkbit = @opcode & (1 << 24) != 0
     if linkbit
       @registers[14] = @pc
+      @debug_args << "link"
     end
     case condition
     when 0b0000
@@ -495,7 +534,7 @@ class Arm9
         @pc = @pc + 4 + offset*4
         @debug_args << "NE"
       end
-      @flag_Z = false
+      #@flag_Z = false
     when 0b1110
       @pc = @pc + 4 + offset*4
       @debug_args << "AL"
@@ -600,26 +639,58 @@ class Arm9
     end
 
     if cond
-      basereg = @registers[(@opcode & (0xF << 16)) >> 16]
-      loadstore = @opcode & (1 << 20)
-      updown = @opcode & (1 << 23)
-      (0...16).each do |i|
+      base_addr = @registers[(@opcode & (0xF << 16)) >> 16]
+      store = @opcode & (1 << 20) == 0
+      writeback = @opcode & (1 << 21) != 0
+      # TODO: PSR & force user bit
+      up = @opcode & (1 << 23) != 0
+      pre = @opcode & (1 << 24) != 0
+
+      regs = Array(UInt8).new
+      (0_u8...16_u8).each do |i|
         if @opcode & (1 << i) != 0
-          if loadstore == 0
-            if updown == 0
-              @bus.arm9_store32(basereg &- i*4, @registers[i])
-            else
-              @bus.arm9_store32(basereg &+ i*4, @registers[i])
-            end
-          else
-            if updown == 0
-              @registers[i] = @bus.arm9_load32(basereg - i*4)
-            else
-              @registers[i] = @bus.arm9_load32(basereg + i*4)
-            end
-          end
+          regs << i
         end
       end
+
+      if store
+        if pre
+          if up
+            base_addr += 4
+          else
+            base_addr -= 4
+          end
+        end
+        if !up
+          base_addr -= 4*(regs.size - 1)
+        end
+        regs.each do |reg|
+          @bus.arm9_store32(base_addr, @registers[reg])
+          base_addr += 4
+        end
+      else
+        if pre
+          if up
+            base_addr += 4
+          else
+            base_addr -= 4
+          end
+        end
+        if !up
+          base_addr -= 4*(regs.size - 1)
+        end
+        regs.each do |reg|
+          @registers[reg] = @bus.arm9_load32(base_addr)
+          base_addr += 4
+        end
+      end
+
+      if !pre || (pre && writeback)
+        @registers[(@opcode & (0xF << 16)) >> 16] = base_addr
+      end
+
+
+
     end
     if @debug #&& @pc != 0x2d4
       @debug_args << "Block Data Transfer"
