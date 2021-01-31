@@ -1,6 +1,6 @@
 
 class Gui
-  def initialize(arm9regs : Pointer(Array(UInt32)), arm7regs : Pointer(Array(UInt32)), sp_irq : Pointer(UInt32), sp_usr : Pointer(UInt32))
+  def initialize(arm9regs : Pointer(Array(UInt32)), arm7regs : Pointer(Array(UInt32)), sp_irq : Pointer(UInt32), sp_usr : Pointer(UInt32), vrama_pixels : Pointer(Array(UInt8)))
     @window = SF::RenderWindow.new(SF::VideoMode.new(WIDTH, HEIGHT), "CryDS", settings: SF::ContextSettings.new(depth: 24, antialiasing: 8))
     @window.vertical_sync_enabled = true
     #@window.framerate_limit = 60
@@ -17,6 +17,7 @@ class Gui
     @romsdir.close
 
     @debug = false
+    @debug_selected = false
 
     @texture = SF::Texture.new(256, 192)
 
@@ -24,6 +25,9 @@ class Gui
     @arm7regs = arm7regs
     @sp_irq = sp_irq
     @sp_usr = sp_usr
+    @vrama_pixels = vrama_pixels
+
+
   end
 
   def debugFalse
@@ -34,15 +38,17 @@ class Gui
     @debug
   end
 
-  def setPointers(arm9regs : Pointer(Array(UInt32)), arm7regs : Pointer(Array(UInt32)), sp_irq : Pointer(UInt32), sp_usr : Pointer(UInt32))
+  def setPointers(arm9regs : Pointer(Array(UInt32)), arm7regs : Pointer(Array(UInt32)), sp_irq : Pointer(UInt32), sp_usr : Pointer(UInt32), vrama_pixels : Pointer(Array(UInt8)))
     @arm9regs = arm9regs
     @arm7regs = arm7regs
     @sp_irq = sp_irq
     @sp_usr = sp_usr
+    @vrama_pixels = vrama_pixels
   end
 
-  def updateScreen(pixels)
+  def updateScreen
 
+    @window.clear
     while (event = @window.poll_event)
       ImGui::SFML.process_event(event)
 
@@ -53,11 +59,12 @@ class Gui
     end
     ImGui::SFML.update(@window, @delta_clock.restart)
 
-    @texture.update(pixels.to_unsafe.as(UInt8*), 256, 192, 0, 0)
+    @texture.update(@vrama_pixels.value.to_unsafe.as(UInt8*), 256, 192, 0, 0)
     ImGui.begin_main_menu_bar
-      if ImGui.begin_menu("debug")
-        if ImGui.menu_item("Toggle debug mode")
+      if ImGui.begin_menu("Debug")
+        if ImGui.menu_item("Toggle debug mode", nil, @debug_selected)
           @debug = true
+          @debug_selected = !@debug_selected
         end
         ImGui.end_menu
       end
@@ -90,7 +97,6 @@ class Gui
       end
     ImGui.end
 
-    @window.clear
     ImGui::SFML.render(@window)
     @window.display
 

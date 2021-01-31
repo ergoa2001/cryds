@@ -1,6 +1,7 @@
 require "colorize"
 
 class Bus
+
   @rom : Array(UInt8)
   @title : Array(UInt8)
   @displayEngineA : DisplayEngineA
@@ -25,6 +26,8 @@ class Bus
     @displayEngineA = displayEngineA
 
     parse_header(@rom)
+    @memory = Array(UInt8).new(0x100000, 0_u8)
+    @memory[@arm9_entry_address - 0x2000000...@arm9_entry_address - 0x2000000 + @arm9_size] = @rom[@arm9_rom_offset...@arm9_rom_offset + @arm9_size]
   end
 
   def arm7_rom_offset : UInt32
@@ -33,6 +36,10 @@ class Bus
 
   def arm9_rom_offset : UInt32
     @arm9_rom_offset
+  end
+
+  def arm9_entry_address : UInt32
+    @arm9_entry_address
   end
 
   def parse_header(rom)
@@ -74,31 +81,45 @@ class Bus
 
   end
 
-  def arm9_get_opcode(addr)
-    if addr < @rom.size
-      @rom[addr].to_u32 | @rom[addr + 1].to_u32 << 8 | @rom[addr + 2].to_u32 << 16 | @rom[addr + 3].to_u32 << 24
+  def arm9_get_opcode(addr, mode)
+    if mode
+      if addr >= @arm9_entry_address && addr < @arm9_entry_address + @arm9_size
+        addr -= 0x2000000
+        @memory[addr].to_u32 | @memory[addr + 1].to_u32 << 8 | @memory[addr + 2].to_u32 << 16 | @memory[addr + 3].to_u32 << 24
+      else
+        #puts "DEBUG9: Unhandled pc32 at 0x#{addr.to_s(16)}"
+        0_u32
+      end
     else
-      #puts "DEBUG9: Unhandled pc32 at 0x#{addr.to_s(16)}"
-      0_u32
+      if addr >= @arm9_entry_address && addr < @arm9_entry_address + @arm9_size
+        addr -= 0x2000000
+        @memory[addr].to_u32 | @memory[addr + 1].to_u32 << 8
+      else
+        #puts "DEBUG9: Unhandled pc32 at 0x#{addr.to_s(16)}"
+        0_u32
+      end
     end
   end
 
   def arm9_load32(addr)
-    addr += 16
-    if addr < @rom.size
-      @rom[addr].to_u32 | @rom[addr + 1].to_u32 << 8 | @rom[addr + 2].to_u32 << 16 | @rom[addr + 3].to_u32 << 24
+    case addr
+    when (0x00000000..0x000008000)
+      @ITCM[addr].to_u32 | (@ITCM[addr + 1].to_u32 << 8) | (@ITCM[addr + 2].to_u32 << 16) | (@ITCM[addr + 3].to_u32 << 24)
+    when (0x02000000..0x02100000)
+      addr -= 0x02000000
+      @memory[addr].to_u32 | (@memory[addr + 1].to_u32 << 8) | (@memory[addr + 2].to_u32 << 16) | (@memory[addr + 3].to_u32 << 24)
     else
-      #puts "DEBUG9: Unhandled load32 at 0x#{addr.to_s(16)}".colorize(:red)
+      puts "DEBUG9: Unhandled load32 at 0x#{addr.to_s(16)}".colorize(:red)
       0_u32
     end
   end
 
   def arm9_load16(addr)
-    addr += 8
-    if addr < @rom.size
-      @rom[addr].to_u16 | @rom[addr + 1].to_u16 << 8
+    if addr >= @arm9_entry_address && addr < @arm9_entry_address + @arm9_size
+      addr -= 0x2000000
+      @memory[addr].to_u16 | @memory[addr + 1].to_u16 << 8
     else
-      puts "DEBUG9: Unhandled load16 from 0x#{addr.to_s(16)}".colorize(:red)
+      #puts "DEBUG9: Unhandled load16 from 0x#{addr.to_s(16)}".colorize(:red)
       0_u32
     end
   end
@@ -109,13 +130,18 @@ class Bus
   end
 
   def arm9_store32(addr, data)
-    #addr += 8
     case addr
     when (0x00000000..0x000008000)
-      @ITCM[addr] = ((data & 0xFF000000) >> 24).to_u8
-      @ITCM[addr + 1] = ((data & 0xFF0000) >> 16).to_u8
-      @ITCM[addr + 2] = ((data & 0xFF00) >> 8).to_u8
-      @ITCM[addr + 3] = (data & 0xFF).to_u8
+      @ITCM[addr] = (data & 0xFF).to_u8
+      @ITCM[addr + 1] = ((data & 0xFF00) >> 8).to_u8
+      @ITCM[addr + 2] = ((data & 0xFF0000) >> 16).to_u8
+      @ITCM[addr + 3] = ((data & 0xFF000000) >> 24).to_u8
+    when (0x02000000..0x02100000)
+      addr -= 0x02000000
+      @memory[addr + 0] = (data & 0xFF).to_u8
+      @memory[addr + 1] = ((data & 0xFF00) >> 8).to_u8
+      @memory[addr + 2] = ((data & 0xFF0000) >> 16).to_u8
+      @memory[addr + 3] = ((data & 0xFF000000) >> 24).to_u8
     when 0x04000304 then @POWCNT1 = data
     when (0x04000000..0x0400006C) then @displayEngineA.store32(addr, data)
     when (0x04000240..0x04000249) then @displayEngineA.store32(addr, data)
@@ -123,9 +149,7 @@ class Bus
       puts "DEBUG9: Unhandled store32 to I/O ports #{addr.to_s(16)}".colorize(:red)
     when (0x6800000..0x681FFFF) then @displayEngineA.store32(addr, data)
     else
-      if data != 0
-        puts "DEBUG9: Unhandled store32 pos #{addr.to_s(16)}, data #{data.to_s(16)}".colorize(:red)
-      end
+      puts "DEBUG9: Unhandled store32 pos #{addr.to_s(16)}, data #{data.to_s(16)}".colorize(:red)
     end
   end
 

@@ -18,18 +18,18 @@ module CryDS
     arm7 = Arm7.new(bus)
     arm9 = Arm9.new(bus, debug)
 
-    gui = Gui.new(arm9.getRegPointer, arm7.getRegPointer, arm9.get_sp_irq_pointer, arm9.get_sp_usr_pointer)
+    gui = Gui.new(arm9.getRegPointer, arm7.getRegPointer, arm9.get_sp_irq_pointer, arm9.get_sp_usr_pointer, displayEngineA.get_vrama_pointer)
 
     runtime = 0
     while arm7.running && arm9.running
       elapsed_time = Time.measure do
-        arm7.run
+        #arm7.run
         arm9.run
         arm9.run
       end
       runtime += elapsed_time.nanoseconds
       if runtime >= 5000000 #16666666
-        gui.updateScreen(displayEngineA.getPixels)
+        gui.updateScreen
         runtime = 0
       end
 
@@ -41,7 +41,7 @@ module CryDS
         bus = Bus.new(rom, displayEngineA)
         arm7 = Arm7.new(bus)
         arm9 = Arm9.new(bus, debug)
-        gui.setPointers(arm9.getRegPointer, arm7.getRegPointer, arm9.get_sp_irq_pointer, arm9.get_sp_usr_pointer)
+        gui.setPointers(arm9.getRegPointer, arm7.getRegPointer, arm9.get_sp_irq_pointer, arm9.get_sp_usr_pointer, displayEngineA.get_vrama_pointer)
       end
 
       if gui.debug

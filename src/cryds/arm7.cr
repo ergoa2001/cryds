@@ -38,8 +38,8 @@ class Arm7
     case op2
     when 0xAF then opcode_b
     else
-      puts "DEBUG7: Invalid opcode #{@opcode.to_s(16)} (#{op1.to_s(16)}, #{op2.to_s(16)}), terminating!"
-      @running = false
+      #puts "DEBUG7: Invalid opcode #{@opcode.to_s(16)} (#{op1.to_s(16)}, #{op2.to_s(16)})"
+      #@running = false
     end
 
     if @debug

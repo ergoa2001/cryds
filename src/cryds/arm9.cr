@@ -2,12 +2,17 @@ require "colorize"
 
 class Arm9
 
+  enum Modes
+    ARM
+    THUMB
+  end
+
   @pc : UInt32
   def initialize(bus : Bus, debug : Bool)
     @running = true
 
     @bus = bus
-    @pc = @bus.arm9_rom_offset
+    @pc = @bus.arm9_entry_address
     @prevpc
 
     @sp_usr = 0_u32
@@ -16,6 +21,7 @@ class Arm9
     @sp_abt = 0_u32
     @sp_irq = 0_u32
     @sp_und = 0_u32
+    @sp = 0_u32
 
     @lr_usr = 0_u16
     @lr_fiq = 0_u16
@@ -40,6 +46,8 @@ class Arm9
     @spsr_abt = 0_u32
     @spsr_irq = 0_u32
     @spsr_und = 0_u32
+
+    @mode = Modes::ARM
 
     @debug = debug
     @debug_args = Array(String).new
@@ -91,19 +99,50 @@ class Arm9
     @flag_Z = answer == 0
   end
 
+
   def run
-
     @pc = @registers[15]
-    @opcode = @bus.arm9_get_opcode(@pc)
+    @opcode = @bus.arm9_get_opcode(@pc, @mode == Modes::ARM)
     @prevpc = @pc
-    @pc += 4
+    @debug_args.clear
 
-
-
-    if @debug
-      @debug_args.clear
+    if @mode == Modes::ARM
+      @pc += 4
+      decode_execute_arm
+    else
+      @pc += 2
+      decode_execute_thumb
     end
+  end
 
+
+  def running
+    @running
+  end
+
+  def decode_execute_thumb
+    op1 = (@opcode & (0xF << 8)) >> 8
+    op2 = (@opcode & (0xF << 12)) >> 12
+    if @opcode & 0b1110000000000000 == 0
+      opcode_thumb_move_shifted_reg
+    elsif @opcode & 0b1110000000000000 == 0b0110000000000000
+      opcode_thumb_load_store_imm_offset
+    elsif @opcode & 0b1110000000000000 == 0b0010000000000000
+      opcode_thumb_move_compare_add_sub_imm
+    elsif @opcode & 0b1111000000000000 == 0b1000000000000000
+      opcode_thumb_lsh
+    elsif @opcode & 0b1111111100000000 == 0b1011000000000000
+      opcode_thumb_add_offset_sp
+    elsif @opcode & 0b1111011000000000 == 0b1011010000000000
+      opcode_thumb_push_pop_reg
+    else
+      puts "Unhandled THUMB opcode #{@opcode.to_s(2)}"
+      exit
+    end
+    @registers[15] = @pc
+  end
+
+  def decode_execute_arm
     # Not needed, but easier to find opcode from http://imrannazar.com/ARM-Opcode-Map
     op1 = (@opcode & 0xF0) >> 4
     op2 = (@opcode & (0xFF << 20)) >> 20
@@ -135,8 +174,8 @@ class Arm9
     #   opcode_multiply_long
     # elsif @opcode & 0b1111100000000000000011110000 == 0b0000100000000000000010010000
     #   opcode_multiply_long
-    # elsif @opcode & 0b1111100000000000000011110000 == 0b0000100000000000000010010000
-    #   opcode_multiply_long
+  elsif @opcode & 0b1111000000000000000000010000 == 0b1110000000000000000000010000
+      opcode_cop_reg_transfer
     # elsif @opcode & 0b1111100000000000000011110000 == 0b0000100000000000000010010000
     #   opcode_multiply_long
     else
@@ -153,11 +192,148 @@ class Arm9
     @registers[15] = @pc
   end
 
-  def running
-    @running
+  ############### OPCODES THUMB ###############
+
+  def opcode_thumb_add_offset_sp
+    offset = @opcode & 0b1111111
+    case offset & 0b11
+    when 1 then offset <<= 2
+    when 2 then offset <<= 1
+    when 3 then offset <<= 2
+    end
+    if @opcode & (1 << 7) != 0
+      offset *= -1
+    end
+    @sp &+= offset
   end
 
-  ################ OPCODES ################
+  def opcode_thumb_push_pop_reg
+    pclr = @opcode & (1 << 8) != 0
+    loadstore = @opcode & (1 << 11) != 0
+    regrange = pclr ? (0...7) : (0...8)
+    regrange.each do |i|
+      if @opcode & (1 << i) != 0
+
+        if loadstore
+          if i = 8
+            i = 15
+          end
+          @registers[i] = @bus.arm9_load32(@sp)
+          @sp += 4
+        else
+          if i = 8
+            i = 14
+          end
+          data = @registers[i]
+          @bus.arm9_store32(@sp, data)
+          @sp -= 4
+        end
+      end
+    end
+  end
+
+  def opcode_thumb_load_store_imm_offset
+    word = @opcode & (1 << 12) == 0
+    loadstore = @opcode & (1 << 11) != 0
+    offset = (@opcode & (0b11111 << 6)) >> 6
+    basereg = (@opcode & 0b111000) >> 3
+    sourcedestreg = @opcode & 0b111
+    address = @registers[basereg] &+ offset
+
+    if loadstore
+      # Load
+      if word
+        data = @bus.arm9_load32(address)
+      else
+        data = @bus.arm9_load8(address)
+      end
+      @registers[sourcedestreg] = data
+    else
+      # Store
+      data = @registers[sourcedestreg]
+      if word
+        @bus.arm9_store32(address, data)
+      else
+        @bus.arm9_store8(address, data)
+      end
+    end
+
+  end
+
+  def opcode_thumb_move_compare_add_sub_imm
+    op = (@opcode & (0b11 << 11)) >> 11
+    sourcedestreg = (@opcode & (0b111 << 8)) >> 8
+    offset = @opcode & 0xFF
+    case op
+    when 0
+      # MOV
+      @registers[sourcedestreg] = offset
+    when 1
+      # CMP
+      if @registers[sourcedestreg] &- offset == 0
+        @flag_Z = true
+      else
+        @flag_Z = false
+      end
+    when 2
+      # ADD
+      @registers[sourcedestreg] &+= offset
+      if  @registers[sourcedestreg] == 0
+        @flag_Z = true
+      else
+        @flag_Z = false
+      end
+    when 3
+      # SUB
+      @registers[sourcedestreg] &-= offset
+      if  @registers[sourcedestreg] == 0
+        @flag_Z = true
+      else
+        @flag_Z = false
+      end
+    else
+      puts "Unhandled thumb_move_compare_add_sub_imm op #{op}"
+    end
+  end
+
+  def opcode_thumb_move_shifted_reg
+    op = (@opcode & (0b11 << 11)) >> 11
+    offset = (@opcode & (0b11111 << 6)) >> 6
+    sourcereg = (@opcode & 0b111000) >> 3
+    destreg = @opcode & 0b111
+
+    case op
+    when 0
+      @registers[destreg] = @registers[sourcereg] << offset
+    when 1
+      @registers[destreg] = @registers[sourcereg] >> offset
+    when 2
+      msb = @registers[sourcereg] & 0b1000000000000000
+      @registers[destreg] = (@registers[sourcereg] >> offset) | msb
+    else
+      puts "Unhandled move shifted reg op #{op}"
+    end
+  end
+
+  def opcode_thumb_lsh
+    loadstore = @opcode & (1 << 11) != 0
+    offset = (@opcode & (0b11111 << 6)) >> 6
+    basereg = (@opcode & 0b111000) >> 3
+    basevalue = @registers[basereg]
+    sourcedestreg = @opcode & 0b111
+
+    address = basevalue &+ offset
+
+    if loadstore
+      data = @bus.arm9_load16(address).to_u32
+      @registers[sourcedestreg] = data
+    else
+      data = @registers[sourcedestreg] & 0xFFFF
+      @bus.arm9_store16(address, data)
+    end
+  end
+
+  ################ OPCODES ARM ################
 
   def opcode_data_processing
     # Condition check
@@ -165,7 +341,7 @@ class Arm9
     cond = case condition
     when 0b0000 then @flag_Z ? true : false # EQ
     when 0b0001 then !@flag_Z ? true : false # NE
-    when 0b0101 then true # ??
+    when 0b0101 then @flag_N ? true : false # ??
     when 0b1110 then true# AL
     else
       false
@@ -182,17 +358,21 @@ class Arm9
       else
         shift = ((@opcode & 0xFF0) >> 4)
         shiftamount = shift & 1 == 0 ? (shift & 0b11111000) >> 3 : @registers[(shift & 0b11111000) >> 3] & 0xFF
+        reg = @opcode & 0xF
         case (shift & 0b110) >> 1
         when 0b00
-          op2 = @registers[@opcode & 0xF] << shiftamount
+          op2 = @registers[reg] << shiftamount
         when 0b01
           if shiftamount == 0
             shiftamount = 32
           end
-          op2 = @registers[@opcode & 0xF] >> shiftamount
+          op2 = @registers[reg] >> shiftamount
         else
           op2 = 0_u32
           puts "DEBUG9: Unimplemented data processing shift"
+        end
+        if reg == 15
+           op2 = @registers[reg] + 8
         end
       end
       destination = (@opcode & (0xF << 12)) >> 12
@@ -244,6 +424,10 @@ class Arm9
           set_logical_flags(answer)
         when 0b0010 # SUB
           answer = op1 &- op2
+          # puts op1
+          # puts op2
+          # puts destination
+          # puts answer
           @registers[destination] = answer
           if change_flags
             @flag_Z = answer == 0
@@ -341,6 +525,9 @@ class Arm9
           end
         when 0b1101 # MOV
           @registers[destination] = op2
+          if destination == 15
+            @pc = op2
+          end
           if change_flags
             set_logical_flags(op2)
           end
@@ -444,7 +631,11 @@ class Arm9
     end
 
     if storemem
+      reg = (@opcode & (0xF << 12)) >> 12
       data = @registers[(@opcode & (0xF << 12)) >> 12]
+      if reg == 15
+        data += 12
+      end
       if datasize
         @bus.arm9_store32(address, data)
         if @debug
@@ -500,9 +691,9 @@ class Arm9
     end
     if !prepost
       if add_offset
-        @registers[(@opcode & (0xF << 16)) >> 16] = address + offset
+        @registers[(@opcode & (0xF << 16)) >> 16] = base_reg + offset
       else
-        @registers[(@opcode & (0xF << 16)) >> 16] = address - offset
+        @registers[(@opcode & (0xF << 16)) >> 16] = base_reg - offset
       end
     end
   end
@@ -519,25 +710,33 @@ class Arm9
     linkbit = @opcode & (1 << 24) != 0
     if linkbit
       @registers[14] = @pc
-      @debug_args << "link"
+      if @debug
+        @debug_args << "link"
+      end
     end
     case condition
     when 0b0000
       if @flag_Z
         @pc = @pc + 4 + offset*4
-        @debug_args << "EQ"
+        if @debug
+          @debug_args << "EQ"
+        end
       end
-      @flag_Z = false
+      #@flag_Z = false
     when 0b0001
       # NE
       if !@flag_Z
         @pc = @pc + 4 + offset*4
-        @debug_args << "NE"
+        if @debug
+          @debug_args << "NE"
+        end
       end
       #@flag_Z = false
     when 0b1110
       @pc = @pc + 4 + offset*4
-      @debug_args << "AL"
+      if @debug
+        @debug_args << "AL"
+      end
     else puts "DEBUG9: Invalid B condition, #{condition.to_s(16)}"
     end
 
@@ -656,32 +855,32 @@ class Arm9
       if store
         if pre
           if up
-            base_addr += 4
+            base_addr &+= 4
           else
-            base_addr -= 4
+            base_addr &-= 4
           end
         end
         if !up
-          base_addr -= 4*(regs.size - 1)
+          base_addr &-= 4*(regs.size - 1)
         end
         regs.each do |reg|
           @bus.arm9_store32(base_addr, @registers[reg])
-          base_addr += 4
+          base_addr &+= 4
         end
       else
         if pre
           if up
-            base_addr += 4
+            base_addr &+= 4
           else
-            base_addr -= 4
+            base_addr &-= 4
           end
         end
         if !up
-          base_addr -= 4*(regs.size - 1)
+          base_addr &-= 4*(regs.size - 1)
         end
         regs.each do |reg|
           @registers[reg] = @bus.arm9_load32(base_addr)
-          base_addr += 4
+          base_addr &+= 4
         end
       end
 
@@ -722,8 +921,10 @@ class Arm9
       @pc = val
       @registers[15] = @pc
       if val & 1 == 1
+        @mode = Modes::THUMB
         puts "Continuing on THUMB"
       else
+        @mode = Modes::ARM
         puts "Continuing on ARM"
       end
       if @debug
@@ -731,7 +932,10 @@ class Arm9
         @debug_args << "new pc 0x#{@pc.to_s(16)}"
       end
     end
+  end
 
+  def opcode_cop_reg_transfer
+    puts "copreg"
   end
 
 end
