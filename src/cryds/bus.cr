@@ -28,6 +28,7 @@ class Bus
     parse_header(@rom)
     @memory = Array(UInt8).new(0x100000, 0_u8)
     @memory[@arm9_entry_address - 0x2000000...@arm9_entry_address - 0x2000000 + @arm9_size] = @rom[@arm9_rom_offset...@arm9_rom_offset + @arm9_size]
+    #@memory[@arm7_entry_address - 0x2000000...@arm7_entry_address - 0x2000000 + @arm7_size] = @rom[@arm7_rom_offset...@arm7_rom_offset + @arm7_size]
   end
 
   def arm7_rom_offset : UInt32
@@ -115,11 +116,12 @@ class Bus
   end
 
   def arm9_load16(addr)
-    if addr >= @arm9_entry_address && addr < @arm9_entry_address + @arm9_size
+    case addr
+    when (0x02000000..0x02100000)
       addr -= 0x2000000
       @memory[addr].to_u16 | @memory[addr + 1].to_u16 << 8
     else
-      #puts "DEBUG9: Unhandled load16 from 0x#{addr.to_s(16)}".colorize(:red)
+      puts "DEBUG9: Unhandled load16 from 0x#{addr.to_s(16)}".colorize(:red)
       0_u32
     end
   end
@@ -155,6 +157,10 @@ class Bus
 
   def arm9_store16(addr, data)
     case addr
+    when (0x02000000..0x02100000)
+      addr -= 0x02000000
+      @memory[addr + 0] = (data & 0xFF).to_u8
+      @memory[addr + 1] = ((data & 0xFF00) >> 8).to_u8
     when (0x6800000..0x681FFFF) then @displayEngineA.store16(addr, data.to_u16!)
 
     else
