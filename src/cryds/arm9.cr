@@ -1,5 +1,7 @@
 require "colorize"
 
+# TODO: fix condition checks
+
 class Arm9
 
   enum Modes
@@ -50,12 +52,17 @@ class Arm9
     @mode = Modes::ARM
 
     @debug = debug
-    @debug_args = Array(String).new
+    @debug_args = Array(Array(String)).new
+    @debug_args_temp = Array(String).new
     @debug_prev = Array(String).new
 
   end
 
-  def getRegPointer
+  def stop
+    @running = false
+  end
+
+  def get_reg_pointer
     pointerof(@registers)
   end
 
@@ -65,6 +72,10 @@ class Arm9
 
   def get_sp_usr_pointer
     pointerof(@sp_usr)
+  end
+
+  def get_debug_args_pointer
+    pointerof(@debug_args)
   end
 
   def getRegs
@@ -104,7 +115,12 @@ class Arm9
     @pc = @registers[15]
     @opcode = @bus.arm9_get_opcode(@pc, @mode == Modes::ARM)
     @prevpc = @pc
-    @debug_args.clear
+    if @debug
+      @debug_args_temp << "0x#{@pc.to_s(16)}"
+    end
+    if @debug_args.size > 100
+      @debug_args.delete_at(0)
+    end
 
     if @mode == Modes::ARM
       @pc += 4
@@ -137,7 +153,8 @@ class Arm9
       opcode_thumb_push_pop_reg
     else
       puts "Unhandled THUMB opcode #{@opcode.to_s(2)}"
-      exit
+      @running = false
+      #exit
     end
     @registers[15] = @pc
   end
@@ -184,12 +201,16 @@ class Arm9
     end
 
     if @debug
-      if @debug_args != @debug_prev
-        puts "DEBUG9: #{@debug_args}"
+      if @debug_args_temp != @debug_prev
+        @debug_args.push(@debug_args_temp.clone)
+        #puts "DEBUG9: #{@debug_args[-1]}"
       end
-      @debug_prev = @debug_args.clone
+      @debug_args_temp.clear
+      @debug_prev = @debug_args[-1].clone
+      sleep 0.1
     end
     @registers[15] = @pc
+
   end
 
   ############### OPCODES THUMB ###############
@@ -380,7 +401,7 @@ class Arm9
       # check for MRS/MSR
       if @opcode & 0b00001111101111110000111111111111 == 0b00000001000011110000000000000000 # MRS
         if @debug
-          @debug_args << "MRS"
+          @debug_args_temp << "MRS"
         end
       elsif @opcode & 0b00001111101111111111111111110000 == 0b00000001001010011111000000000000 # MSR, register to PSR
         dest_CPSR = @opcode & (1 << 22) == 0
@@ -392,18 +413,18 @@ class Arm9
           @spsr_irq = data
         end
         if @debug
-          @debug_args << "MSR"
+          @debug_args_temp << "MSR"
           if dest_CPSR
-            @debug_args << "cpsr"
+            @debug_args_temp << "cpsr"
           else
-            @debug_args << "spsr"
+            @debug_args_temp << "spsr"
           end
-          @debug_args << "r#{reg}"
-          @debug_args << data.to_s(16)
+          @debug_args_temp << "r#{reg}"
+          @debug_args_temp << data.to_s(16)
         end
       elsif @opcode & 0b00001101101111111111000000000000 == 0b00000001001010001111000000000000 # MSR reg or imm to PSR flag bits only
         if @debug
-          @debug_args << "MSR2 (Unimplemented)"
+          @debug_args_temp << "MSR2 (Unimplemented)"
         end
       else
         case operation
@@ -416,7 +437,7 @@ class Arm9
             set_logical_flags(answer)
           end
           if @debug
-            @debug_args << "AND"
+            @debug_args_temp << "AND"
           end
         when 0b0001 # EOR
           answer = op1 ^ op2
@@ -434,8 +455,8 @@ class Arm9
           end
 
           if @debug
-            @debug_args << "SUB"
-            @debug_args << destination.to_s
+            @debug_args_temp << "SUB"
+            @debug_args_temp << destination.to_s
           end
         #elsif operation == 0b0011
         when 0b0011 # RSB
@@ -443,7 +464,7 @@ class Arm9
           @registers[destination] = answer
           # TODO: FLAGS
           if @debug
-            @debug_args << "RSB"
+            @debug_args_temp << "RSB"
           end
         when 0b0100 # ADD
           answer = op1 &+ op2
@@ -454,7 +475,7 @@ class Arm9
             @flag_Z = answer == 0
           end
           if @debug
-            @debug_args << "ADD"
+            @debug_args_temp << "ADD"
           end
         when 0b0101 # ADC
           answer = op1 &+ op2
@@ -464,14 +485,14 @@ class Arm9
           @registers[destination] = answer
           # TODO: FLAGS
           if @debug
-            @debug_args << "ADC"
+            @debug_args_temp << "ADC"
           end
         when 0b0110 # SBC
           bit = @flag_C ? 1_u32 : 0_u32
           @registers[(@opcode & (0xF << 12)) >> 12] = op1 - op2 + bit - 1
 
           if @debug
-            @debug_args << "SBC"
+            @debug_args_temp << "SBC"
           end
         when 0b0111 # RSC
           answer = op2 - op1 - 1
@@ -480,7 +501,7 @@ class Arm9
           end
           # TODO: FLAGS
           if @debug
-            @debug_args << "RSC"
+            @debug_args_temp << "RSC"
           end
         when 0b1000 # TST
           answer = op1 & op2
@@ -488,7 +509,7 @@ class Arm9
             set_logical_flags(answer)
           end
           if @debug
-            @debug_args << "TEQ"
+            @debug_args_temp << "TEQ"
           end
         when 0b1001 # TEQ
           answer = op1 ^ op2
@@ -496,7 +517,7 @@ class Arm9
             set_logical_flags(answer)
           end
           if @debug
-            @debug_args << "TEQ"
+            @debug_args_temp << "TEQ"
           end
 
         when 0b1010 # CMP
@@ -508,7 +529,7 @@ class Arm9
           end
 
           if @debug
-            @debug_args << "CMP"
+            @debug_args_temp << "CMP"
           end
         when 0b1011 # CMN
           answer = op1 &+ op2
@@ -521,7 +542,7 @@ class Arm9
             set_logical_flags(answer)
           end
           if @debug
-            @debug_args << "ORR"
+            @debug_args_temp << "ORR"
           end
         when 0b1101 # MOV
           @registers[destination] = op2
@@ -532,8 +553,8 @@ class Arm9
             set_logical_flags(op2)
           end
           if @debug
-            @debug_args << "MOV"
-            @debug_args << destination.to_s
+            @debug_args_temp << "MOV"
+            @debug_args_temp << destination.to_s
           end
         when 0b1110 # BIC
           answer = op1 & ~op2
@@ -542,17 +563,17 @@ class Arm9
             set_logical_flags(answer)
           end
           if @debug
-            @debug_args << "BIC"
-            @debug_args << op1.to_s(16)
-            @debug_args << (~op2).to_s(16)
-            @debug_args << destination.to_s
+            @debug_args_temp << "BIC"
+            @debug_args_temp << op1.to_s(16)
+            @debug_args_temp << (~op2).to_s(16)
+            @debug_args_temp << destination.to_s
           end
         when 0b1111 # MVN
           answer = ~op2
           @registers[destination] = answer
           # TODO: FLAGS
           if @debug
-            @debug_args << "MVN"
+            @debug_args_temp << "MVN"
           end
         else
           puts "DEBUG9: missing opcode_dataprocessing #{operation.to_s(2)}"
@@ -560,12 +581,12 @@ class Arm9
       end
 
       if @debug
-        @debug_args << op1.to_s(16)
-        @debug_args << op2.to_s(16)
+        @debug_args_temp << op1.to_s(16)
+        @debug_args_temp << op2.to_s(16)
       end
     else
       if @debug
-        @debug_args << "nul"
+        @debug_args_temp << "nul"
       end
 
     end
@@ -606,7 +627,7 @@ class Arm9
 
     base_reg = @registers[(@opcode & (0xF << 16)) >> 16]
     if (@opcode & (0xF << 16)) >> 16 == 15
-      base_reg -= 8
+      base_reg += 8
     end
     storemem = @opcode & (1 << 20) == 0
     writeback = @opcode & (1 << 21) != 0
@@ -639,36 +660,37 @@ class Arm9
       if datasize
         @bus.arm9_store32(address, data)
         if @debug
-          @debug_args << "STR"
-          @debug_args << address.to_s(16)
-          @debug_args << data.to_s(16)
+          @debug_args_temp << "STR"
+          @debug_args_temp << address.to_s(16)
+          @debug_args_temp << data.to_s(16)
         end
       else
         @bus.arm9_store8(address, data)
         if @debug
-          @debug_args << "STRB"
-          @debug_args << address.to_s(16)
-          @debug_args << data.to_s(16)
+          @debug_args_temp << "STRB"
+          @debug_args_temp << address.to_s(16)
+          @debug_args_temp << data.to_s(16)
         end
       end
     else
       if datasize
         data = @bus.arm9_load32(address)
         if @debug
-          @debug_args << "LDR"
-          @debug_args << address.to_s(16)
-          @debug_args << data.to_s(16)
+          @debug_args_temp << "LDR"
+          @debug_args_temp << address.to_s(16)
+          @debug_args_temp << data.to_s(16)
+          @debug_args_temp << @opcode.to_s(16)
         end
       else
         data = @bus.arm9_load8(address)
         if @debug
-          @debug_args << "LDRB"
-          @debug_args << address.to_s(16)
-          @debug_args << data.to_s(16)
+          @debug_args_temp << "LDRB"
+          @debug_args_temp << address.to_s(16)
+          @debug_args_temp << data.to_s(16)
         end
       end
       reg = (@opcode & (0xF << 12)) >> 12
-      @debug_args << reg.to_s
+      @debug_args_temp << reg.to_s
       if reg == 13
         mode = @cpsr & 0b11111
         case mode
@@ -700,7 +722,7 @@ class Arm9
 
   def opcode_branch
     if @debug# && @pc != 0x2d0
-      @debug_args << "Branch"
+      @debug_args_temp << "Branch"
     end
 
     condition = (@opcode & (0xF << 28)) >> 28
@@ -711,7 +733,7 @@ class Arm9
     if linkbit
       @registers[14] = @pc
       if @debug
-        @debug_args << "link"
+        @debug_args_temp << "link"
       end
     end
     case condition
@@ -719,7 +741,7 @@ class Arm9
       if @flag_Z
         @pc = @pc + 4 + offset*4
         if @debug
-          @debug_args << "EQ"
+          @debug_args_temp << "EQ"
         end
       end
       #@flag_Z = false
@@ -728,14 +750,14 @@ class Arm9
       if !@flag_Z
         @pc = @pc + 4 + offset*4
         if @debug
-          @debug_args << "NE"
+          @debug_args_temp << "NE"
         end
       end
       #@flag_Z = false
     when 0b1110
       @pc = @pc + 4 + offset*4
       if @debug
-        @debug_args << "AL"
+        @debug_args_temp << "AL"
       end
     else puts "DEBUG9: Invalid B condition, #{condition.to_s(16)}"
     end
@@ -787,9 +809,9 @@ class Arm9
         @bus.arm9_store16(addr, @registers[(@opcode & (0xF << 12)) >> 12])
 
         if @debug
-          @debug_args << "STRH"
-          @debug_args << addr.to_s(16)
-          @debug_args << @registers[(@opcode & (0xF << 12)) >> 12].to_s(16)
+          @debug_args_temp << "STRH"
+          @debug_args_temp << addr.to_s(16)
+          @debug_args_temp << @registers[(@opcode & (0xF << 12)) >> 12].to_s(16)
         end
 
       else
@@ -798,9 +820,9 @@ class Arm9
         @registers[(@opcode & (0xF << 12)) >> 12] = data
 
         if @debug
-          @debug_args << "LDRH"
-          @debug_args << ((@opcode & (0xF << 12)) >> 12).to_s(16)
-          @debug_args << data.to_s(16)
+          @debug_args_temp << "LDRH"
+          @debug_args_temp << ((@opcode & (0xF << 12)) >> 12).to_s(16)
+          @debug_args_temp << data.to_s(16)
         end
       end
     end
@@ -892,14 +914,14 @@ class Arm9
 
     end
     if @debug #&& @pc != 0x2d4
-      @debug_args << "Block Data Transfer"
+      @debug_args_temp << "Block Data Transfer"
     end
   end
 
   def opcode_branch_exchange
     condition = (@opcode & (0xF << 28)) >> 28
     if @debug
-      @debug_args << "BX"
+      @debug_args_temp << "BX"
     end
     case condition
     when 0b0000
@@ -909,7 +931,7 @@ class Arm9
         cond = false
       end
       if @debug
-        @debug_args << "eq"
+        @debug_args_temp << "eq"
       end
     when 0b1110 then cond = true
     else puts "Unhandled bx condition #{condition.to_s(2)}".colorize(:red)
@@ -928,8 +950,8 @@ class Arm9
         puts "Continuing on ARM"
       end
       if @debug
-        @debug_args << "r#{reg}"
-        @debug_args << "new pc 0x#{@pc.to_s(16)}"
+        @debug_args_temp << "r#{reg}"
+        @debug_args_temp << "new pc 0x#{@pc.to_s(16)}"
       end
     end
   end

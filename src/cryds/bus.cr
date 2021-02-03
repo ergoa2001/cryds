@@ -29,6 +29,7 @@ class Bus
     @memory = Array(UInt8).new(0x100000, 0_u8)
     @memory[@arm9_entry_address - 0x2000000...@arm9_entry_address - 0x2000000 + @arm9_size] = @rom[@arm9_rom_offset...@arm9_rom_offset + @arm9_size]
     #@memory[@arm7_entry_address - 0x2000000...@arm7_entry_address - 0x2000000 + @arm7_size] = @rom[@arm7_rom_offset...@arm7_rom_offset + @arm7_size]
+    @vblank = 0_u16
   end
 
   def arm7_rom_offset : UInt32
@@ -104,11 +105,14 @@ class Bus
 
   def arm9_load32(addr)
     case addr
-    when (0x00000000..0x000008000)
+    when (0x00000000..0x02000000)
+      addr &= 0x7FFF
       @ITCM[addr].to_u32 | (@ITCM[addr + 1].to_u32 << 8) | (@ITCM[addr + 2].to_u32 << 16) | (@ITCM[addr + 3].to_u32 << 24)
-    when (0x02000000..0x02100000)
+    when (0x02000000..0x03000000)
+      addr &= 0x020FFFFF
       addr -= 0x02000000
       @memory[addr].to_u32 | (@memory[addr + 1].to_u32 << 8) | (@memory[addr + 2].to_u32 << 16) | (@memory[addr + 3].to_u32 << 24)
+    when 0x04000130 then 0xFF_u32
     else
       puts "DEBUG9: Unhandled load32 at 0x#{addr.to_s(16)}".colorize(:red)
       0_u32
@@ -117,9 +121,13 @@ class Bus
 
   def arm9_load16(addr)
     case addr
-    when (0x02000000..0x02100000)
-      addr -= 0x2000000
+    when (0x02000000..0x03000000)
+      addr &= 0x020FFFFF
+      addr -= 0x02000000
       @memory[addr].to_u16 | @memory[addr + 1].to_u16 << 8
+    when 0x4000004
+      @vblank ^= 1
+      @vblank
     else
       puts "DEBUG9: Unhandled load16 from 0x#{addr.to_s(16)}".colorize(:red)
       0_u32
@@ -127,18 +135,30 @@ class Bus
   end
 
   def arm9_load8(addr)
-    puts "DEBUG9: Unhandled load8 pos #{addr.to_s(16)}".colorize(:red)
-    0_u32
+    case addr
+    when (0x00000000..0x02000000)
+      addr &= 0x7FFF
+      @ITCM[addr].to_u32
+    when (0x02000000..0x03000000)
+      addr &= 0x020FFFFF
+      addr -= 0x02000000
+      @memory[addr].to_u32
+    else
+      puts "DEBUG9: Unhandled load8 pos #{addr.to_s(16)}".colorize(:red)
+      0_u32
+    end
   end
 
   def arm9_store32(addr, data)
     case addr
-    when (0x00000000..0x000008000)
+    when (0x00000000..0x02000000)
+      addr &= 0x7FFF
       @ITCM[addr] = (data & 0xFF).to_u8
       @ITCM[addr + 1] = ((data & 0xFF00) >> 8).to_u8
       @ITCM[addr + 2] = ((data & 0xFF0000) >> 16).to_u8
       @ITCM[addr + 3] = ((data & 0xFF000000) >> 24).to_u8
-    when (0x02000000..0x02100000)
+    when (0x02000000..0x03000000)
+      addr &= 0x020FFFFF
       addr -= 0x02000000
       @memory[addr + 0] = (data & 0xFF).to_u8
       @memory[addr + 1] = ((data & 0xFF00) >> 8).to_u8
@@ -157,7 +177,8 @@ class Bus
 
   def arm9_store16(addr, data)
     case addr
-    when (0x02000000..0x02100000)
+    when (0x02000000..0x03000000)
+      addr &= 0x020FFFFF
       addr -= 0x02000000
       @memory[addr + 0] = (data & 0xFF).to_u8
       @memory[addr + 1] = ((data & 0xFF00) >> 8).to_u8
@@ -170,7 +191,14 @@ class Bus
 
   def arm9_store8(addr, data)
     case addr
+    when (0x00000000..0x02000000)
+      addr &= 0x7FFF
+      @ITCM[addr] = (data & 0xFF).to_u8
     when 0x4000240 then @displayEngineA.store8(addr, data)
+    when (0x02000000..0x03000000)
+      addr &= 0x020FFFFF
+      addr -= 0x02000000
+      @memory[addr + 0] = (data & 0xFF).to_u8
     else puts "DEBUG9: Unhandled store8 pos #{addr.to_s(16)}".colorize(:red)
     end
   end

@@ -1,6 +1,6 @@
 
 class Gui
-  def initialize(arm9regs : Pointer(Array(UInt32)), arm7regs : Pointer(Array(UInt32)), sp_irq : Pointer(UInt32), sp_usr : Pointer(UInt32), vrama_pixels : Pointer(Array(UInt8)))
+  def initialize(arm9regs : Pointer(Array(UInt32)), arm7regs : Pointer(Array(UInt32)), sp_irq : Pointer(UInt32), sp_usr : Pointer(UInt32), vrama_pixels : Pointer(Array(UInt8)), debug_args : Pointer(Array(Array(String))))
     @window = SF::RenderWindow.new(SF::VideoMode.new(WIDTH, HEIGHT), "CryDS", settings: SF::ContextSettings.new(depth: 24, antialiasing: 8))
     @window.vertical_sync_enabled = true
     #@window.framerate_limit = 60
@@ -27,7 +27,15 @@ class Gui
     @sp_usr = sp_usr
     @vrama_pixels = vrama_pixels
 
+    @debug_args = debug_args
 
+    @running = true
+
+
+  end
+
+  def running
+    @running
   end
 
   def debugFalse
@@ -38,12 +46,13 @@ class Gui
     @debug
   end
 
-  def setPointers(arm9regs : Pointer(Array(UInt32)), arm7regs : Pointer(Array(UInt32)), sp_irq : Pointer(UInt32), sp_usr : Pointer(UInt32), vrama_pixels : Pointer(Array(UInt8)))
+  def setPointers(arm9regs : Pointer(Array(UInt32)), arm7regs : Pointer(Array(UInt32)), sp_irq : Pointer(UInt32), sp_usr : Pointer(UInt32), vrama_pixels : Pointer(Array(UInt8)), debug_args : Pointer(Array(Array(String))))
     @arm9regs = arm9regs
     @arm7regs = arm7regs
     @sp_irq = sp_irq
     @sp_usr = sp_usr
     @vrama_pixels = vrama_pixels
+    @debug_args = debug_args
   end
 
   def updateScreen
@@ -88,6 +97,10 @@ class Gui
     ImGui.begin("ROMS")
       if ImGui.button("Load ROM")
         @loadrom = !@loadrom
+        @running = true
+      end
+      if ImGui.button("Stop ROM")
+        @running = false
       end
       (0...@roms.size).each do |i|
         if ImGui.selectable(@roms[i], i == @romselected)
@@ -96,6 +109,16 @@ class Gui
         end
       end
     ImGui.end
+    if @debug_selected
+      ImGui.begin("DEBUG")
+        @debug_args.value.each do |debug_line|
+          ImGui.text(debug_line.to_s)
+        end
+        if @running
+          ImGui.set_scroll_here_y(1_f32)
+        end
+      ImGui.end
+    end
 
     ImGui::SFML.render(@window)
     @window.display
