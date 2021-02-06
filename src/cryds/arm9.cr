@@ -1,15 +1,13 @@
 require "colorize"
 
-# TODO: fix condition checks
-
 class Arm9
-
   enum Modes
     ARM
     THUMB
   end
 
   @pc : UInt32
+  @armlut : Array(Proc((Bool | UInt32 | Nil)) | Proc((UInt32 | Nil)) | Proc(Nil) | Proc(UInt32))
   def initialize(bus : Bus, debug : Bool)
     @running = true
 
@@ -55,6 +53,14 @@ class Arm9
     @debug_args = Array(Array(String)).new
     @debug_args_temp = Array(String).new
     @debug_prev = Array(String).new
+
+    @cond = true
+
+    # CP15 regs
+    @tcmitcmbvs = 0xFF_u32
+    @tcmdtcmbvs = 0x27C0000_u32
+
+    @armlut = [->opcode_data_processing_imm_shift, ->opcode_data_processing_reg, ->opcode_data_processing_imm_shift, ->opcode_data_processing_reg, ->opcode_data_processing_imm_shift, ->opcode_data_processing_reg, ->opcode_data_processing_imm_shift, ->opcode_data_processing_reg, ->opcode_data_processing_imm_shift, ->opcode_multiply, ->opcode_data_processing_imm_shift, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift_flags, ->opcode_data_processing_reg_flag, ->opcode_data_processing_imm_shift_flags, ->opcode_data_processing_reg_flag, ->opcode_data_processing_imm_shift_flags, ->opcode_data_processing_reg_flag, ->opcode_data_processing_imm_shift_flags, ->opcode_data_processing_reg_flag, ->opcode_data_processing_imm_shift_flags, ->opcode_multiply, ->opcode_data_processing_imm_shift_flags, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift_flags, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift_flags, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift, ->opcode_data_processing_reg, ->opcode_data_processing_imm_shift, ->opcode_data_processing_reg, ->opcode_data_processing_imm_shift, ->opcode_data_processing_reg, ->opcode_data_processing_imm_shift, ->opcode_data_processing_reg, ->opcode_data_processing_imm_shift, ->opcode_multiply, ->opcode_data_processing_imm_shift, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift_flags, ->opcode_data_processing_reg_flag, ->opcode_data_processing_imm_shift_flags, ->opcode_data_processing_reg_flag, ->opcode_data_processing_imm_shift_flags, ->opcode_data_processing_reg_flag, ->opcode_data_processing_imm_shift_flags, ->opcode_data_processing_reg_flag, ->opcode_data_processing_imm_shift_flags, ->opcode_multiply, ->opcode_data_processing_imm_shift_flags, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift_flags, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift_flags, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift, ->opcode_data_processing_reg, ->opcode_data_processing_imm_shift, ->opcode_data_processing_reg, ->opcode_data_processing_imm_shift, ->opcode_data_processing_reg, ->opcode_data_processing_imm_shift, ->opcode_data_processing_reg, ->opcode_data_processing_imm_shift, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift_flags, ->opcode_data_processing_reg_flag, ->opcode_data_processing_imm_shift_flags, ->opcode_data_processing_reg_flag, ->opcode_data_processing_imm_shift_flags, ->opcode_data_processing_reg_flag, ->opcode_data_processing_imm_shift_flags, ->opcode_data_processing_reg_flag, ->opcode_data_processing_imm_shift_flags, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift_flags, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift_flags, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift_flags, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift, ->opcode_data_processing_reg, ->opcode_data_processing_imm_shift, ->opcode_data_processing_reg, ->opcode_data_processing_imm_shift, ->opcode_data_processing_reg, ->opcode_data_processing_imm_shift, ->opcode_data_processing_reg, ->opcode_data_processing_imm_shift, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift_flags, ->opcode_data_processing_reg_flag, ->opcode_data_processing_imm_shift_flags, ->opcode_data_processing_reg_flag, ->opcode_data_processing_imm_shift_flags, ->opcode_data_processing_reg_flag, ->opcode_data_processing_imm_shift_flags, ->opcode_data_processing_reg_flag, ->opcode_data_processing_imm_shift_flags, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift_flags, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift_flags, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift_flags, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift, ->opcode_data_processing_reg, ->opcode_data_processing_imm_shift, ->opcode_data_processing_reg, ->opcode_data_processing_imm_shift, ->opcode_data_processing_reg, ->opcode_data_processing_imm_shift, ->opcode_data_processing_reg, ->opcode_data_processing_imm_shift, ->opcode_multiply_long, ->opcode_data_processing_imm_shift, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift_flags, ->opcode_data_processing_reg_flag, ->opcode_data_processing_imm_shift_flags, ->opcode_data_processing_reg_flag, ->opcode_data_processing_imm_shift_flags, ->opcode_data_processing_reg_flag, ->opcode_data_processing_imm_shift_flags, ->opcode_data_processing_reg_flag, ->opcode_data_processing_imm_shift_flags, ->opcode_multiply_long, ->opcode_data_processing_imm_shift_flags, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift_flags, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift_flags, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift, ->opcode_data_processing_reg, ->opcode_data_processing_imm_shift, ->opcode_data_processing_reg, ->opcode_data_processing_imm_shift, ->opcode_data_processing_reg, ->opcode_data_processing_imm_shift, ->opcode_data_processing_reg, ->opcode_data_processing_imm_shift, ->opcode_multiply_long, ->opcode_data_processing_imm_shift, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift_flags, ->opcode_data_processing_reg_flag, ->opcode_data_processing_imm_shift_flags, ->opcode_data_processing_reg_flag, ->opcode_data_processing_imm_shift_flags, ->opcode_data_processing_reg_flag, ->opcode_data_processing_imm_shift_flags, ->opcode_data_processing_reg_flag, ->opcode_data_processing_imm_shift_flags, ->opcode_multiply_long, ->opcode_data_processing_imm_shift_flags, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift_flags, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift_flags, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift, ->opcode_data_processing_reg, ->opcode_data_processing_imm_shift, ->opcode_data_processing_reg, ->opcode_data_processing_imm_shift, ->opcode_data_processing_reg, ->opcode_data_processing_imm_shift, ->opcode_data_processing_reg, ->opcode_data_processing_imm_shift, ->opcode_multiply_long, ->opcode_data_processing_imm_shift, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift_flags, ->opcode_data_processing_reg_flag, ->opcode_data_processing_imm_shift_flags, ->opcode_data_processing_reg_flag, ->opcode_data_processing_imm_shift_flags, ->opcode_data_processing_reg_flag, ->opcode_data_processing_imm_shift_flags, ->opcode_data_processing_reg_flag, ->opcode_data_processing_imm_shift_flags, ->opcode_multiply_long, ->opcode_data_processing_imm_shift_flags, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift_flags, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift_flags, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift, ->opcode_data_processing_reg, ->opcode_data_processing_imm_shift, ->opcode_data_processing_reg, ->opcode_data_processing_imm_shift, ->opcode_data_processing_reg, ->opcode_data_processing_imm_shift, ->opcode_data_processing_reg, ->opcode_data_processing_imm_shift, ->opcode_multiply_long, ->opcode_data_processing_imm_shift, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift_flags, ->opcode_data_processing_reg_flag, ->opcode_data_processing_imm_shift_flags, ->opcode_data_processing_reg_flag, ->opcode_data_processing_imm_shift_flags, ->opcode_data_processing_reg_flag, ->opcode_data_processing_imm_shift_flags, ->opcode_data_processing_reg_flag, ->opcode_data_processing_imm_shift_flags, ->opcode_multiply_long, ->opcode_data_processing_imm_shift_flags, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift_flags, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift_flags, ->opcode_load_store_misc, ->opcode_psrt_transfer, ->opcode_data_processing_reg, ->opcode_data_processing_imm_shift, ->opcode_data_processing_reg, ->opcode_data_processing_imm_shift, ->opcode_qadd, ->opcode_data_processing_imm_shift, ->opcode_data_processing_reg, ->opcode_multiply_long, ->opcode_swap, ->opcode_multiply_long, ->opcode_load_store_misc, ->opcode_multiply_long, ->opcode_load_store_misc, ->opcode_multiply_long, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift_flags, ->opcode_data_processing_reg_flag, ->opcode_data_processing_imm_shift_flags, ->opcode_data_processing_reg_flag, ->opcode_data_processing_imm_shift_flags, ->opcode_data_processing_reg_flag, ->opcode_data_processing_imm_shift_flags, ->opcode_data_processing_reg_flag, ->opcode_data_processing_imm_shift_flags, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift_flags, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift_flags, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift_flags, ->opcode_load_store_misc, ->opcode_psrt_transfer, ->opcode_branch_exchange, ->opcode_data_processing_imm_shift, ->opcode_blx2, ->opcode_data_processing_imm_shift, ->opcode_qsub, ->opcode_data_processing_imm_shift, ->opcode_data_processing_reg, ->opcode_multiply_long, ->opcode_load_store_misc, ->opcode_multiply_long, ->opcode_load_store_misc, ->opcode_multiply_long, ->opcode_load_store_misc, ->opcode_multiply_long, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift_flags, ->opcode_data_processing_reg_flag, ->opcode_data_processing_imm_shift_flags, ->opcode_data_processing_reg_flag, ->opcode_data_processing_imm_shift_flags, ->opcode_data_processing_reg_flag, ->opcode_data_processing_imm_shift_flags, ->opcode_data_processing_reg_flag, ->opcode_data_processing_imm_shift_flags, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift_flags, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift_flags, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift_flags, ->opcode_load_store_misc, ->opcode_psrt_transfer, ->opcode_data_processing_reg, ->opcode_data_processing_imm_shift, ->opcode_data_processing_reg, ->opcode_data_processing_imm_shift, ->opcode_data_processing_reg, ->opcode_data_processing_imm_shift, ->opcode_data_processing_reg, ->opcode_multiply_long, ->opcode_swap, ->opcode_multiply_long, ->opcode_load_store_misc, ->opcode_multiply_long, ->opcode_load_store_misc, ->opcode_multiply_long, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift_flags, ->opcode_data_processing_reg_flag, ->opcode_data_processing_imm_shift_flags, ->opcode_data_processing_reg_flag, ->opcode_data_processing_imm_shift_flags, ->opcode_data_processing_reg_flag, ->opcode_data_processing_imm_shift_flags, ->opcode_data_processing_reg_flag, ->opcode_data_processing_imm_shift_flags, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift_flags, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift_flags, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift_flags, ->opcode_load_store_misc, ->opcode_psrt_transfer, ->opcode_clz, ->opcode_data_processing_imm_shift, ->opcode_data_processing_reg, ->opcode_data_processing_imm_shift, ->opcode_data_processing_reg, ->opcode_data_processing_imm_shift, ->opcode_data_processing_reg, ->opcode_multiply_long, ->opcode_load_store_misc, ->opcode_multiply_long, ->opcode_load_store_misc, ->opcode_multiply_long, ->opcode_load_store_misc, ->opcode_multiply_long, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift_flags, ->opcode_data_processing_reg_flag, ->opcode_data_processing_imm_shift_flags, ->opcode_data_processing_reg_flag, ->opcode_data_processing_imm_shift_flags, ->opcode_data_processing_reg_flag, ->opcode_data_processing_imm_shift_flags, ->opcode_data_processing_reg_flag, ->opcode_data_processing_imm_shift_flags, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift_flags, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift_flags, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift_flags, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift, ->opcode_data_processing_reg, ->opcode_data_processing_imm_shift, ->opcode_data_processing_reg, ->opcode_data_processing_imm_shift, ->opcode_data_processing_reg, ->opcode_data_processing_imm_shift, ->opcode_data_processing_reg, ->opcode_data_processing_imm_shift, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift_flags, ->opcode_data_processing_reg_flag, ->opcode_data_processing_imm_shift_flags, ->opcode_data_processing_reg_flag, ->opcode_data_processing_imm_shift_flags, ->opcode_data_processing_reg_flag, ->opcode_data_processing_imm_shift_flags, ->opcode_data_processing_reg_flag, ->opcode_data_processing_imm_shift_flags, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift_flags, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift_flags, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift_flags, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift, ->opcode_data_processing_reg, ->opcode_data_processing_imm_shift, ->opcode_data_processing_reg, ->opcode_data_processing_imm_shift, ->opcode_data_processing_reg, ->opcode_data_processing_imm_shift, ->opcode_data_processing_reg, ->opcode_data_processing_imm_shift, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift_flags, ->opcode_data_processing_reg_flag, ->opcode_data_processing_imm_shift_flags, ->opcode_data_processing_reg_flag, ->opcode_data_processing_imm_shift_flags, ->opcode_data_processing_reg_flag, ->opcode_data_processing_imm_shift_flags, ->opcode_data_processing_reg_flag, ->opcode_data_processing_imm_shift_flags, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift_flags, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift_flags, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift_flags, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift, ->opcode_data_processing_reg, ->opcode_data_processing_imm_shift, ->opcode_data_processing_reg, ->opcode_data_processing_imm_shift, ->opcode_data_processing_reg, ->opcode_data_processing_imm_shift, ->opcode_data_processing_reg, ->opcode_data_processing_imm_shift, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift_flags, ->opcode_data_processing_reg_flag, ->opcode_data_processing_imm_shift_flags, ->opcode_data_processing_reg_flag, ->opcode_data_processing_imm_shift_flags, ->opcode_data_processing_reg_flag, ->opcode_data_processing_imm_shift_flags, ->opcode_data_processing_reg_flag, ->opcode_data_processing_imm_shift_flags, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift_flags, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift_flags, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift_flags, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift, ->opcode_data_processing_reg, ->opcode_data_processing_imm_shift, ->opcode_data_processing_reg, ->opcode_data_processing_imm_shift, ->opcode_data_processing_reg, ->opcode_data_processing_imm_shift, ->opcode_data_processing_reg, ->opcode_data_processing_imm_shift, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift_flags, ->opcode_data_processing_reg_flag, ->opcode_data_processing_imm_shift_flags, ->opcode_data_processing_reg_flag, ->opcode_data_processing_imm_shift_flags, ->opcode_data_processing_reg_flag, ->opcode_data_processing_imm_shift_flags, ->opcode_data_processing_reg_flag, ->opcode_data_processing_imm_shift_flags, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift_flags, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift_flags, ->opcode_load_store_misc, ->opcode_data_processing_imm_shift_flags, ->opcode_load_store_misc, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_psrt_transfer, ->opcode_psrt_transfer, ->opcode_psrt_transfer, ->opcode_psrt_transfer, ->opcode_psrt_transfer, ->opcode_psrt_transfer, ->opcode_psrt_transfer, ->opcode_psrt_transfer, ->opcode_psrt_transfer, ->opcode_psrt_transfer, ->opcode_psrt_transfer, ->opcode_psrt_transfer, ->opcode_psrt_transfer, ->opcode_psrt_transfer, ->opcode_psrt_transfer, ->opcode_psrt_transfer, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_psrt_transfer, ->opcode_psrt_transfer, ->opcode_psrt_transfer, ->opcode_psrt_transfer, ->opcode_psrt_transfer, ->opcode_psrt_transfer, ->opcode_psrt_transfer, ->opcode_psrt_transfer, ->opcode_psrt_transfer, ->opcode_psrt_transfer, ->opcode_psrt_transfer, ->opcode_psrt_transfer, ->opcode_psrt_transfer, ->opcode_psrt_transfer, ->opcode_psrt_transfer, ->opcode_psrt_transfer, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_psrt_transfer, ->opcode_psrt_transfer, ->opcode_psrt_transfer, ->opcode_psrt_transfer, ->opcode_psrt_transfer, ->opcode_psrt_transfer, ->opcode_psrt_transfer, ->opcode_psrt_transfer, ->opcode_psrt_transfer, ->opcode_psrt_transfer, ->opcode_psrt_transfer, ->opcode_psrt_transfer, ->opcode_psrt_transfer, ->opcode_psrt_transfer, ->opcode_psrt_transfer, ->opcode_psrt_transfer, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_psrt_transfer, ->opcode_psrt_transfer, ->opcode_psrt_transfer, ->opcode_psrt_transfer, ->opcode_psrt_transfer, ->opcode_psrt_transfer, ->opcode_psrt_transfer, ->opcode_psrt_transfer, ->opcode_psrt_transfer, ->opcode_psrt_transfer, ->opcode_psrt_transfer, ->opcode_psrt_transfer, ->opcode_psrt_transfer, ->opcode_psrt_transfer, ->opcode_psrt_transfer, ->opcode_psrt_transfer, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_data_processing_imm_flags, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_imm, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_load_store_shift, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_stm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_ldm, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_branch_link, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_cop_data_operation, ->opcode_cop_reg_transfer, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi, ->opcode_swi]
 
   end
 
@@ -110,7 +116,6 @@ class Arm9
     @flag_Z = answer == 0
   end
 
-
   def run
     @pc = @registers[15]
     @opcode = @bus.arm9_get_opcode(@pc, @mode == Modes::ARM)
@@ -118,19 +123,35 @@ class Arm9
     if @debug
       @debug_args_temp << "0x#{@pc.to_s(16)}"
     end
-    if @debug_args.size > 100
+    if @debug_args.size > 300
       @debug_args.delete_at(0)
     end
 
     if @mode == Modes::ARM
       @pc += 4
-      decode_execute_arm
+      #puts "#{((@opcode >> 4) & 0xF).to_s(16)}, #{(((@opcode >> 16) & 0xFF0) >> 4).to_s(16)}"
+      lut_index = (((@opcode >> 4) & 0xF) | ((@opcode >> 16) & 0xFF0))
+      instruction = @armlut[lut_index]
+      condition = (@opcode & (0xF << 28)) >> 28
+      @cond = case condition
+      when 0b0000 then @flag_Z ? true : false # EQ
+      when 0b0001 then !@flag_Z ? true : false # NE
+      #when 0b0101 then @flag_N ? true : false # ??
+      #when 0b1010 then @flag_N == @flag_V
+      when 0b1110 then true # AL
+      else
+        puts "DEBUG9: Invalid condition, #{condition.to_s(16)}"
+        false
+      end
+      if @cond
+        instruction.call
+      end
     else
       @pc += 2
       decode_execute_thumb
     end
+    @registers[15] = @pc
   end
-
 
   def running
     @running
@@ -156,65 +177,12 @@ class Arm9
       @running = false
       #exit
     end
-    @registers[15] = @pc
-  end
-
-  def decode_execute_arm
-    # Not needed, but easier to find opcode from http://imrannazar.com/ARM-Opcode-Map
-    op1 = (@opcode & 0xF0) >> 4
-    op2 = (@opcode & (0xFF << 20)) >> 20
-
-    if @opcode & 0b1111111111111111111111110000 == 0b0001001011111111111100010000
-      opcode_branch_exchange
-    elsif @opcode & 0xC000000 == 0 && @opcode & 0xF0 != 0x90 && @opcode & 0xE400090 != 0x400090 # Funny magic numbers to select the right opcode, hopefully
-      opcode_data_processing
-    # elsif @opcode & 0b1111110000000000000011110000 == 0b0000000000000000000010010000
-    #   opcode_multiply
-    # elsif @opcode & 0b1111100000000000000011110000 == 0b0000100000000000000010010000
-    #   opcode_multiply_long
-    # elsif @opcode & 0b1111101100000000111111110000 == 0b0001000000000000000010010000
-    #   opcode_single_data_swap
-    elsif @opcode & 0xE000000 == 0xA000000
-      opcode_branch
-
-    # elsif @opcode & 0b1111100000000000000011110000 == 0b0000100000000000000010010000
-    #   opcode_multiply_long
-    elsif @opcode & @opcode & 0xE400090 == 0x400090
-      opcode_halfword_data_immediate
-    elsif @opcode & 0xC000000 == 0x4000000 && @opcode & 0x2000010 != 0x2000010
-      opcode_single_data_transfer
-    elsif @opcode & 0xE000000 == 0x8000000
-      opcode_block_data_transfer
-    # elsif @opcode & 0b1111100000000000000011110000 == 0b0000100000000000000010010000
-    #   opcode_multiply_long
-    # elsif @opcode & 0b1111100000000000000011110000 == 0b0000100000000000000010010000
-    #   opcode_multiply_long
-    # elsif @opcode & 0b1111100000000000000011110000 == 0b0000100000000000000010010000
-    #   opcode_multiply_long
-  elsif @opcode & 0b1111000000000000000000010000 == 0b1110000000000000000000010000
-      opcode_cop_reg_transfer
-    # elsif @opcode & 0b1111100000000000000011110000 == 0b0000100000000000000010010000
-    #   opcode_multiply_long
-    else
-      puts "DEBUG9: Invalid opcode #{@opcode.to_s(16)} #{@opcode.to_s(2)} (#{op1.to_s(16)}, #{op2.to_s(16)}), terminating!".colorize(:red)
-      @running = false
-    end
-
-    if @debug
-      if @debug_args_temp != @debug_prev
-        @debug_args.push(@debug_args_temp.clone)
-        #puts "DEBUG9: #{@debug_args[-1]}"
-      end
-      @debug_args_temp.clear
-      @debug_prev = @debug_args[-1].clone
-      sleep 0.1
-    end
-    @registers[15] = @pc
-
   end
 
   ############### OPCODES THUMB ###############
-
+  # Most of these are just redirects to others#
+  # Really need to clean the code up          #
+  #############################################
   def opcode_thumb_add_offset_sp
     offset = @opcode & 0b1111111
     case offset & 0b11
@@ -356,255 +324,235 @@ class Arm9
 
   ################ OPCODES ARM ################
 
-  def opcode_data_processing
-    # Condition check
+  def opcode_data_processing_imm_shift
+    operation = (@opcode & (0b1111 << 21)) >> 21
+    op1 = @registers[(@opcode & (0xF << 16)) >> 16]
+    change_flags = (@opcode & (1 << 20)) != 0
+    if @opcode & (1 << 25) != 0
+      rot = ((@opcode & (0xF << 8)) >> 8)*2
+      op2 = ((@opcode & 0xFF) >> rot) | ((@opcode & 0xFF) << (32 - rot))
+    else
+      shift = ((@opcode & 0xFF0) >> 4)
+      shiftamount = shift & 1 == 0 ? (shift & 0b11111000) >> 3 : @registers[(shift & 0b11111000) >> 3] & 0xFF
+      reg = @opcode & 0xF
+      case (shift & 0b110) >> 1
+      when 0b00
+        op2 = @registers[reg] << shiftamount
+      when 0b01
+        if shiftamount == 0
+          shiftamount = 32
+        end
+        op2 = @registers[reg] >> shiftamount
+      else
+        op2 = 0_u32
+        puts "DEBUG9: Unimplemented data processing shift"
+      end
+      if reg == 15
+         op2 = @registers[reg] + 8
+      end
+    end
+    destination = (@opcode & (0xF << 12)) >> 12
+
+    case operation
+    when 0b0000 # AND
+      answer = op1 & op2
+      @registers[destination] = answer
+      if change_flags
+        set_logical_flags(answer)
+      end
+    when 0b0001 # EOR
+      answer = op1 ^ op2
+      @registers[destination] = answer
+      set_logical_flags(answer)
+    when 0b0010 # SUB
+      answer = op1 &- op2
+      @registers[destination] = answer
+      if change_flags
+        @flag_Z = answer == 0
+      end
+    #elsif operation == 0b0011
+    when 0b0011 # RSB
+      answer = op2 &- op1
+      @registers[destination] = answer
+    when 0b0100 # ADD
+      answer = op1 &+ op2
+      @registers[destination] = answer
+      # TODO: FLAGS
+      if change_flags
+        @flag_N = answer & (1 << 31) != 0
+        @flag_Z = answer == 0
+      end
+    when 0b0101 # ADC
+      answer = op1 &+ op2
+      if @flag_C
+        answer += 1
+      end
+      @registers[destination] = answer
+    when 0b0110 # SBC
+      bit = @flag_C ? 1_u32 : 0_u32
+      @registers[(@opcode & (0xF << 12)) >> 12] = op1 - op2 + bit - 1
+    when 0b0111 # RSC
+      answer = op2 - op1 - 1
+      if @flag_C
+        answer += 1
+      end
+    when 0b1000 # TST
+      answer = op1 & op2
+      if change_flags
+        set_logical_flags(answer)
+      end
+    when 0b1001 # TEQ
+      answer = op1 ^ op2
+      if change_flags
+        set_logical_flags(answer)
+      end
+    when 0b1010 # CMP
+      answer = op1 &- op2
+      @flag_Z = answer == 0
+    when 0b1011 # CMN
+      answer = op1 &+ op2
+    when 0b1100 # ORR
+      answer = op1 | op2
+      @registers[destination] = answer
+      if change_flags
+        set_logical_flags(answer)
+      end
+    when 0b1101 # MOV
+      @registers[destination] = op2
+      if destination == 15
+        @pc = op2
+      end
+      if change_flags
+        set_logical_flags(op2)
+      end
+    when 0b1110 # BIC
+      answer = op1 & ~op2
+      @registers[destination] = answer
+      if change_flags# && destination != 15
+        set_logical_flags(answer)
+      end
+    when 0b1111 # MVN
+      answer = ~op2
+      @registers[destination] = answer
+    else
+      puts "DEBUG9: missing opcode_dataprocessing #{operation.to_s(2)}"
+    end
+  end
+
+  def opcode_data_processing_imm_shift_flags
+    opcode_data_processing_imm_shift
+  end
+
+  def opcode_data_processing_reg
+    puts "Unhandled opcode_data_processing_reg"
+  end
+
+  def opcode_data_processing_reg_flag
+    puts "Unhandled opcode_data_processing_reg_flag"
+  end
+
+  def opcode_load_store_misc # fix pls
     condition = (@opcode & (0xF << 28)) >> 28
-    cond = case condition
-    when 0b0000 then @flag_Z ? true : false # EQ
-    when 0b0001 then !@flag_Z ? true : false # NE
-    when 0b0101 then @flag_N ? true : false # ??
-    when 0b1110 then true# AL
-    else
-      false
-      puts "DEBUG9: Invalid opcode_data_processing condition, #{condition.to_s(16)}"
+    offset = (@opcode & (0xF << 8)) >> 4 | (@opcode & 0xF)
+    base_reg = @registers[(@opcode & (0xF << 16)) >> 16]
+    # TODO: sh checks
+    sh = (@opcode & (0b11 << 5)) >> 5
+
+    writeback = @opcode & (1 << 21)
+
+    prepost = @opcode & (1 << 24)
+    if prepost == 0
+      writeback = 1
+    end
+    addr = base_reg
+    if prepost != 0
+      if @opcode & (1 << 23) == 0
+        addr = base_reg - offset
+      else
+        addr = base_reg + offset
+      end
     end
 
-    if cond
-      operation = (@opcode & (0b1111 << 21)) >> 21
-      op1 = @registers[(@opcode & (0xF << 16)) >> 16]
-      change_flags = (@opcode & (1 << 20)) != 0
-      if @opcode & (1 << 25) != 0
-        rot = ((@opcode & (0xF << 8)) >> 8)*2
-        op2 = ((@opcode & 0xFF) >> rot) | ((@opcode & 0xFF) << (32 - rot))
-      else
-        shift = ((@opcode & 0xFF0) >> 4)
-        shiftamount = shift & 1 == 0 ? (shift & 0b11111000) >> 3 : @registers[(shift & 0b11111000) >> 3] & 0xFF
-        reg = @opcode & 0xF
-        case (shift & 0b110) >> 1
-        when 0b00
-          op2 = @registers[reg] << shiftamount
-        when 0b01
-          if shiftamount == 0
-            shiftamount = 32
-          end
-          op2 = @registers[reg] >> shiftamount
-        else
-          op2 = 0_u32
-          puts "DEBUG9: Unimplemented data processing shift"
-        end
-        if reg == 15
-           op2 = @registers[reg] + 8
-        end
-      end
-      destination = (@opcode & (0xF << 12)) >> 12
-
-      # check for MRS/MSR
-      if @opcode & 0b00001111101111110000111111111111 == 0b00000001000011110000000000000000 # MRS
-        if @debug
-          @debug_args_temp << "MRS"
-        end
-      elsif @opcode & 0b00001111101111111111111111110000 == 0b00000001001010011111000000000000 # MSR, register to PSR
-        dest_CPSR = @opcode & (1 << 22) == 0
-        reg = @opcode & 0b1111
-        data = @registers[reg]
-        if dest_CPSR
-          @cpsr = data
-        else
-          @spsr_irq = data
-        end
-        if @debug
-          @debug_args_temp << "MSR"
-          if dest_CPSR
-            @debug_args_temp << "cpsr"
-          else
-            @debug_args_temp << "spsr"
-          end
-          @debug_args_temp << "r#{reg}"
-          @debug_args_temp << data.to_s(16)
-        end
-      elsif @opcode & 0b00001101101111111111000000000000 == 0b00000001001010001111000000000000 # MSR reg or imm to PSR flag bits only
-        if @debug
-          @debug_args_temp << "MSR2 (Unimplemented)"
-        end
-      else
-        case operation
-        when 0b0000 # AND
-          answer = op1 & op2
-          @registers[destination] = answer
-
-          # TODO: FLAGS
-          if change_flags
-            set_logical_flags(answer)
-          end
-          if @debug
-            @debug_args_temp << "AND"
-          end
-        when 0b0001 # EOR
-          answer = op1 ^ op2
-          @registers[destination] = answer
-          set_logical_flags(answer)
-        when 0b0010 # SUB
-          answer = op1 &- op2
-          # puts op1
-          # puts op2
-          # puts destination
-          # puts answer
-          @registers[destination] = answer
-          if change_flags
-            @flag_Z = answer == 0
-          end
-
-          if @debug
-            @debug_args_temp << "SUB"
-            @debug_args_temp << destination.to_s
-          end
-        #elsif operation == 0b0011
-        when 0b0011 # RSB
-          answer = op2 &- op1
-          @registers[destination] = answer
-          # TODO: FLAGS
-          if @debug
-            @debug_args_temp << "RSB"
-          end
-        when 0b0100 # ADD
-          answer = op1 &+ op2
-          @registers[destination] = answer
-          # TODO: FLAGS
-          if change_flags
-            @flag_N = answer & (1 << 31) != 0
-            @flag_Z = answer == 0
-          end
-          if @debug
-            @debug_args_temp << "ADD"
-          end
-        when 0b0101 # ADC
-          answer = op1 &+ op2
-          if @flag_C
-            answer += 1
-          end
-          @registers[destination] = answer
-          # TODO: FLAGS
-          if @debug
-            @debug_args_temp << "ADC"
-          end
-        when 0b0110 # SBC
-          bit = @flag_C ? 1_u32 : 0_u32
-          @registers[(@opcode & (0xF << 12)) >> 12] = op1 - op2 + bit - 1
-
-          if @debug
-            @debug_args_temp << "SBC"
-          end
-        when 0b0111 # RSC
-          answer = op2 - op1 - 1
-          if @flag_C
-            answer += 1
-          end
-          # TODO: FLAGS
-          if @debug
-            @debug_args_temp << "RSC"
-          end
-        when 0b1000 # TST
-          answer = op1 & op2
-          if change_flags
-            set_logical_flags(answer)
-          end
-          if @debug
-            @debug_args_temp << "TEQ"
-          end
-        when 0b1001 # TEQ
-          answer = op1 ^ op2
-          if change_flags
-            set_logical_flags(answer)
-          end
-          if @debug
-            @debug_args_temp << "TEQ"
-          end
-
-        when 0b1010 # CMP
-          answer = op1 &- op2
-          if answer == 0
-            @flag_Z = true
-          else
-            @flag_Z = false
-          end
-
-          if @debug
-            @debug_args_temp << "CMP"
-          end
-        when 0b1011 # CMN
-          answer = op1 &+ op2
-          # TODO: FLAGS
-
-        when 0b1100 # ORR
-          answer = op1 | op2
-          @registers[destination] = answer
-          if change_flags
-            set_logical_flags(answer)
-          end
-          if @debug
-            @debug_args_temp << "ORR"
-          end
-        when 0b1101 # MOV
-          @registers[destination] = op2
-          if destination == 15
-            @pc = op2
-          end
-          if change_flags
-            set_logical_flags(op2)
-          end
-          if @debug
-            @debug_args_temp << "MOV"
-            @debug_args_temp << destination.to_s
-          end
-        when 0b1110 # BIC
-          answer = op1 & ~op2
-          @registers[destination] = answer
-          if change_flags# && destination != 15
-            set_logical_flags(answer)
-          end
-          if @debug
-            @debug_args_temp << "BIC"
-            @debug_args_temp << op1.to_s(16)
-            @debug_args_temp << (~op2).to_s(16)
-            @debug_args_temp << destination.to_s
-          end
-        when 0b1111 # MVN
-          answer = ~op2
-          @registers[destination] = answer
-          # TODO: FLAGS
-          if @debug
-            @debug_args_temp << "MVN"
-          end
-        else
-          puts "DEBUG9: missing opcode_dataprocessing #{operation.to_s(2)}"
-        end
-      end
+    if @opcode & (1 << 20) == 0
+      # Store to mem
+      @bus.arm9_store16(addr, @registers[(@opcode & (0xF << 12)) >> 12])
 
       if @debug
-        @debug_args_temp << op1.to_s(16)
-        @debug_args_temp << op2.to_s(16)
+        @debug_args_temp << "STRH"
+        @debug_args_temp << addr.to_s(16)
+        @debug_args_temp << @registers[(@opcode & (0xF << 12)) >> 12].to_s(16)
       end
+
     else
-      if @debug
-        @debug_args_temp << "nul"
-      end
+      # Load from mem
+      data = @bus.arm9_load16(addr).to_u32
+      @registers[(@opcode & (0xF << 12)) >> 12] = data
 
+      if @debug
+        @debug_args_temp << "LDRH"
+        @debug_args_temp << ((@opcode & (0xF << 12)) >> 12).to_s(16)
+        @debug_args_temp << data.to_s(16)
+      end
+    end
+
+    if prepost == 0
+      if @opcode & (1 << 23) == 0
+        addr = base_reg - offset
+      else
+        addr = base_reg + offset
+      end
+    end
+    if writeback != 0
+      @registers[(@opcode & (0xF << 16)) >> 16] = addr
     end
   end
 
-  def opcode_multiply
-    puts "DEBUG9: missing opcode_multiply"
+  def opcode_psrt_transfer
+    if @opcode & 0b00001111101111110000111111111111 == 0b00000001000011110000000000000000 # MRS
+      puts "Unhandled MRS"
+    elsif @opcode & 0b00001111101111111111111111110000 == 0b00000001001010011111000000000000 # MSR, register to PSR
+      dest_CPSR = @opcode & (1 << 22) == 0
+      reg = @opcode & 0b1111
+      data = @registers[reg]
+      if dest_CPSR
+        @cpsr = data
+      else
+        @spsr_irq = data
+      end
+    elsif @opcode & 0b00001101101111111111000000000000 == 0b00000001001010001111000000000000 # MSR reg or imm to PSR flag bits only
+      puts "Unhandled MSR2"
+    end
   end
 
-  def opcode_multiply_long
-    puts "DEBUG9: missing opcode_multiply_long"
+  def opcode_qadd
+    puts "Unhandled opcode_qadd"
   end
 
-  def opcode_single_data_swap
-    puts "DEBUG9: missing opcode_single_data_swap"
+  def opcode_swap
+    puts "Unhandled opcode_swap"
   end
 
-  def opcode_single_data_transfer
+  def opcode_blx2
+    puts "Unhandled opcode_blx2"
+  end
+
+  def opcode_qsub
+    puts "Unhandled opcode_qsub"
+  end
+
+  def opcode_clz
+    puts "Unhandled opcode_clz"
+  end
+
+  def opcode_data_processing_imm
+    opcode_data_processing_imm_shift
+  end
+
+  def opcode_data_processing_imm_flags
+    opcode_data_processing_imm_shift
+  end
+
+  def opcode_load_store_imm
     if @opcode & (1 << 25) == 0
       # Immediate offset
       offset = @opcode & 0xFFF
@@ -659,35 +607,14 @@ class Arm9
       end
       if datasize
         @bus.arm9_store32(address, data)
-        if @debug
-          @debug_args_temp << "STR"
-          @debug_args_temp << address.to_s(16)
-          @debug_args_temp << data.to_s(16)
-        end
       else
         @bus.arm9_store8(address, data)
-        if @debug
-          @debug_args_temp << "STRB"
-          @debug_args_temp << address.to_s(16)
-          @debug_args_temp << data.to_s(16)
-        end
       end
     else
       if datasize
         data = @bus.arm9_load32(address)
-        if @debug
-          @debug_args_temp << "LDR"
-          @debug_args_temp << address.to_s(16)
-          @debug_args_temp << data.to_s(16)
-          @debug_args_temp << @opcode.to_s(16)
-        end
       else
         data = @bus.arm9_load8(address)
-        if @debug
-          @debug_args_temp << "LDRB"
-          @debug_args_temp << address.to_s(16)
-          @debug_args_temp << data.to_s(16)
-        end
       end
       reg = (@opcode & (0xF << 12)) >> 12
       @debug_args_temp << reg.to_s
@@ -720,244 +647,122 @@ class Arm9
     end
   end
 
-  def opcode_branch
-    if @debug# && @pc != 0x2d0
-      @debug_args_temp << "Branch"
+  def opcode_load_store_shift
+    puts "Unhandled opcode_load_store_shift"
+  end
+
+  def opcode_stm
+    base_addr = @registers[(@opcode & (0xF << 16)) >> 16]
+    store = @opcode & (1 << 20) == 0
+    writeback = @opcode & (1 << 21) != 0
+    # TODO: PSR & force user bit
+    up = @opcode & (1 << 23) != 0
+    pre = @opcode & (1 << 24) != 0
+
+    regs = Array(UInt8).new
+    (0_u8...16_u8).each do |i|
+      if @opcode & (1 << i) != 0
+        regs << i
+      end
     end
 
-    condition = (@opcode & (0xF << 28)) >> 28
+    if store
+      if pre
+        if up
+          base_addr &+= 4
+        else
+          base_addr &-= 4
+        end
+      end
+      if !up
+        base_addr &-= 4*(regs.size - 1)
+      end
+      regs.each do |reg|
+        @bus.arm9_store32(base_addr, @registers[reg])
+        base_addr &+= 4
+      end
+    else
+      if pre
+        if up
+          base_addr &+= 4
+        else
+          base_addr &-= 4
+        end
+      end
+      if !up
+        base_addr &-= 4*(regs.size - 1)
+      end
+      regs.each do |reg|
+        @registers[reg] = @bus.arm9_load32(base_addr)
+        base_addr &+= 4
+      end
+    end
+
+    if !pre || (pre && writeback)
+      @registers[(@opcode & (0xF << 16)) >> 16] = base_addr
+    end
+
+  end
+
+  def opcode_ldm
+    opcode_stm
+  end
+
+  def opcode_branch_link
     offset = (@opcode & 0xFFFFFF).to_i32
     offset = offset - ((offset >> 23) << 24)
-    # TODO: Link bit
     linkbit = @opcode & (1 << 24) != 0
     if linkbit
       @registers[14] = @pc
-      if @debug
-        @debug_args_temp << "link"
-      end
     end
-    case condition
-    when 0b0000
-      if @flag_Z
-        @pc = @pc + 4 + offset*4
-        if @debug
-          @debug_args_temp << "EQ"
-        end
-      end
-      #@flag_Z = false
-    when 0b0001
-      # NE
-      if !@flag_Z
-        @pc = @pc + 4 + offset*4
-        if @debug
-          @debug_args_temp << "NE"
-        end
-      end
-      #@flag_Z = false
-    when 0b1110
-      @pc = @pc + 4 + offset*4
-      if @debug
-        @debug_args_temp << "AL"
-      end
-    else puts "DEBUG9: Invalid B condition, #{condition.to_s(16)}"
-    end
-
-
+    @pc = @pc + 4 + offset*4
   end
 
-  def opcode_halfword_data_immediate
-
-    condition = (@opcode & (0xF << 28)) >> 28
-    offset = (@opcode & (0xF << 8)) >> 4 | (@opcode & 0xF)
-    base_reg = @registers[(@opcode & (0xF << 16)) >> 16]
-    # TODO: sh checks
-    sh = (@opcode & (0b11 << 5)) >> 5
-    case condition
-    when 0b0001
-      # NE
-      if !@flag_Z
-        cond = true
-      else
-        cond = false
-      end
-      @flag_Z = false
-    when 0b1110
-      # AL
-      cond = true
-    else puts "DEBUG9: Invalid opcode_halfword_data_immediate condition, #{condition.to_s(16)}"
-    end
-
-    # TODO: writeback
-    writeback = @opcode & (1 << 21)
-
-    prepost = @opcode & (1 << 24)
-    if prepost == 0
-      writeback = 1
-    end
-    addr = base_reg
-    if prepost != 0
-      if @opcode & (1 << 23) == 0
-        addr = base_reg - offset
-      else
-        addr = base_reg + offset
-      end
-    end
-
-    if cond
-      if @opcode & (1 << 20) == 0
-        # Store to mem
-        @bus.arm9_store16(addr, @registers[(@opcode & (0xF << 12)) >> 12])
-
-        if @debug
-          @debug_args_temp << "STRH"
-          @debug_args_temp << addr.to_s(16)
-          @debug_args_temp << @registers[(@opcode & (0xF << 12)) >> 12].to_s(16)
-        end
-
-      else
-        # Load from mem
-        data = @bus.arm9_load16(addr).to_u32
-        @registers[(@opcode & (0xF << 12)) >> 12] = data
-
-        if @debug
-          @debug_args_temp << "LDRH"
-          @debug_args_temp << ((@opcode & (0xF << 12)) >> 12).to_s(16)
-          @debug_args_temp << data.to_s(16)
-        end
-      end
-    end
-
-    if prepost == 0
-      if @opcode & (1 << 23) == 0
-        addr = base_reg - offset
-      else
-        addr = base_reg + offset
-      end
-    end
-    if writeback != 0
-      @registers[(@opcode & (0xF << 16)) >> 16] = addr
-    end
-
-
+  def opcode_cop_data_transfer
+    puts "Unhandled opcode_cop_data_transfer"
   end
 
-  def opcode_block_data_transfer
-    condition = (@opcode & (0xF << 28)) >> 28
-    cond = false
-    case condition
-    when 0b0001
-      # NE
-      if !@flag_Z
-        cond = true
-      else
-        cond = false
-      end
-      @flag_Z = false
-    when 0b1110
-      # AL
-      cond = true
-    else puts "DEBUG9: Invalid opcode_block_data_transfer condition, #{condition.to_s(2)}"
-    end
+  def opcode_cop_data_operation
+    puts "Unhandled opcode_cop_data_operation"
+  end
 
-    if cond
-      base_addr = @registers[(@opcode & (0xF << 16)) >> 16]
-      store = @opcode & (1 << 20) == 0
-      writeback = @opcode & (1 << 21) != 0
-      # TODO: PSR & force user bit
-      up = @opcode & (1 << 23) != 0
-      pre = @opcode & (1 << 24) != 0
+  def opcode_swi
+    puts "Unhandled opcode_swi"
+  end
 
-      regs = Array(UInt8).new
-      (0_u8...16_u8).each do |i|
-        if @opcode & (1 << i) != 0
-          regs << i
-        end
-      end
+  def opcode_multiply
+    puts "Unhandled opcode_multiply"
+  end
 
-      if store
-        if pre
-          if up
-            base_addr &+= 4
-          else
-            base_addr &-= 4
-          end
-        end
-        if !up
-          base_addr &-= 4*(regs.size - 1)
-        end
-        regs.each do |reg|
-          @bus.arm9_store32(base_addr, @registers[reg])
-          base_addr &+= 4
-        end
-      else
-        if pre
-          if up
-            base_addr &+= 4
-          else
-            base_addr &-= 4
-          end
-        end
-        if !up
-          base_addr &-= 4*(regs.size - 1)
-        end
-        regs.each do |reg|
-          @registers[reg] = @bus.arm9_load32(base_addr)
-          base_addr &+= 4
-        end
-      end
-
-      if !pre || (pre && writeback)
-        @registers[(@opcode & (0xF << 16)) >> 16] = base_addr
-      end
-
-
-
-    end
-    if @debug #&& @pc != 0x2d4
-      @debug_args_temp << "Block Data Transfer"
-    end
+  def opcode_multiply_long
+    puts "Unhandled opcode_multiply_long"
   end
 
   def opcode_branch_exchange
-    condition = (@opcode & (0xF << 28)) >> 28
-    if @debug
-      @debug_args_temp << "BX"
+    reg = @opcode & 0xF
+    val = @registers[reg]
+    @pc = val
+    @registers[15] = @pc
+    if val & 1 == 1
+      @mode = Modes::THUMB
+      puts "Continuing on THUMB"
+    else
+      @mode = Modes::ARM
+      puts "Continuing on ARM"
     end
-    case condition
-    when 0b0000
-      if @flag_Z
-        cond = true
-      else
-        cond = false
-      end
-      if @debug
-        @debug_args_temp << "eq"
-      end
-    when 0b1110 then cond = true
-    else puts "Unhandled bx condition #{condition.to_s(2)}".colorize(:red)
-    end
+  end
 
-    if cond
-      reg = @opcode & 0xF
-      val = @registers[reg]
-      @pc = val
-      @registers[15] = @pc
-      if val & 1 == 1
-        @mode = Modes::THUMB
-        puts "Continuing on THUMB"
-      else
-        @mode = Modes::ARM
-        puts "Continuing on ARM"
-      end
-      if @debug
-        @debug_args_temp << "r#{reg}"
-        @debug_args_temp << "new pc 0x#{@pc.to_s(16)}"
-      end
+  def opcode_branch
+    offset = (@opcode & 0xFFFFFF).to_i32
+    offset = offset - ((offset >> 23) << 24)
+    linkbit = @opcode & (1 << 24) != 0
+    if linkbit
+      @registers[14] = @pc
     end
+    @pc = @pc + 4 + offset*4
   end
 
   def opcode_cop_reg_transfer
-    puts "copreg"
+    puts "Unhandled opcode_cop_reg_transfer"
   end
-
 end

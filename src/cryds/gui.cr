@@ -1,7 +1,7 @@
 
 class Gui
   def initialize(arm9regs : Pointer(Array(UInt32)), arm7regs : Pointer(Array(UInt32)), sp_irq : Pointer(UInt32), sp_usr : Pointer(UInt32), vrama_pixels : Pointer(Array(UInt8)), debug_args : Pointer(Array(Array(String))))
-    @window = SF::RenderWindow.new(SF::VideoMode.new(WIDTH, HEIGHT), "CryDS", settings: SF::ContextSettings.new(depth: 24, antialiasing: 8))
+    @window = SF::RenderWindow.new(SF::VideoMode.new(1280, 720), "CryDS", settings: SF::ContextSettings.new(depth: 24, antialiasing: 8))
     @window.vertical_sync_enabled = true
     #@window.framerate_limit = 60
     ImGui::SFML.init(@window)

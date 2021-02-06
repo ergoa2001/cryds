@@ -112,7 +112,7 @@ class Bus
       addr &= 0x020FFFFF
       addr -= 0x02000000
       @memory[addr].to_u32 | (@memory[addr + 1].to_u32 << 8) | (@memory[addr + 2].to_u32 << 16) | (@memory[addr + 3].to_u32 << 24)
-    when 0x04000130 then 0xFF_u32
+    #when 0x04000130 then 0xFF_u32
     else
       puts "DEBUG9: Unhandled load32 at 0x#{addr.to_s(16)}".colorize(:red)
       0_u32
@@ -183,6 +183,7 @@ class Bus
       @memory[addr + 0] = (data & 0xFF).to_u8
       @memory[addr + 1] = ((data & 0xFF00) >> 8).to_u8
     when (0x6800000..0x681FFFF) then @displayEngineA.store16(addr, data.to_u16!)
+    when (0x7000000..0x7000400) then @displayEngineA.store16(addr, data.to_u16!)
 
     else
       puts "DEBUG9: Unhandled store16 pos #{addr.to_s(16)}, data #{data.to_u16!.to_s(16)}".colorize(:red)

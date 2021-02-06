@@ -8,7 +8,7 @@ HEIGHT = 720 #256*2
 
 class DisplayEngineA
   def initialize
-    @lcd_control = 0_u32
+    @dispcnt = 0_u32
     @vramcnt_a = 0_u8
     @vramcnt_b = 0_u8
     @vram_a = Array(UInt8).new(0x20000, 0_u8)
@@ -16,12 +16,16 @@ class DisplayEngineA
     (1...0x10000).each do |i|
       @vrama_pixels[i*4 - 1] = 255_u8
     end
+    @oam = Array(UInt8).new(1024, 0_u8)
   end
 
   def store32(addr, data)
+    #puts "Disp store32 addr 0x#{addr.to_s(16)}, data 0x#{data.to_s(16)}"
     case addr
-    when 0x04000000 then @lcd_control = data
-    when 0x04000240 then @vramcnt_a = data.to_u8! # TODO: wrong, i think
+    when 0x04000000
+      puts "LCD Control 0x#{data.to_s(16)}"
+      @dispcnt = data
+    when 0x04000240 then @vramcnt_a = (data & 0xFF).to_u8
     when (0x6800000..0x681FFFF)
       addr = addr - 0x6800000
       val1 = ((data & (0xFF << 24)) >> 24).to_u8
@@ -58,6 +62,11 @@ class DisplayEngineA
 
   def store16(addr, data)
     case addr
+    when (0x7000000..0x8000000)
+      addr -= 0x7000000
+      addr &= 0x3FF
+      @oam[addr] = ((data & 0xFF00) >> 8).to_u8
+      @oam[addr + 1] = (data & 0xFF).to_u8
     when (0x6800000..0x681FFFF)
       addr = addr - 0x6800000
       val1 = ((data & (0xFF << 8)) >> 8).to_u8

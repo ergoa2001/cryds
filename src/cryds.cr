@@ -26,7 +26,7 @@ module CryDS
       elapsed_time = Time.measure do
         while arm7.running && arm9.running
           elapsed_time_run = Time.measure do
-            #arm7.run
+            arm7.run
             arm9.run
             arm9.run
           end
